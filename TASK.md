@@ -47,10 +47,10 @@ fi
 ---
 
 ## Milestone 2: Pretrained CIFAR-10 Models & Normalization Wrapper (`src/models.py`)
-- [ ] **2.1.** Implement `NormalizedModelWrapper(nn.Module)` in `src/models.py` so input tensors $x$ remain strictly in $[0.0, 1.0]$ and $(x - \mu)/\sigma$ normalization happens inside `forward()`.
-- [ ] **2.2.** Implement loader for **`CNN-Clean`**: Load pretrained CIFAR-10 ResNet (`cifar10_resnet20` via `torch.hub.load("chenyaofo/pytorch-cifar-models", ...)`).
-- [ ] **2.3.** Implement loader for **`ViT-Clean`**: Load pretrained CIFAR-10 Vision Transformer (`aaraki/vit-base-patch16-224-in21k-finetuned-cifar10` or `timm` small ViT with bilinear upsampling inside wrapper).
-- [ ] **2.4.** Write a quick sanity test verifying both models output shape `(batch_size, 10)` on a dummy $[0, 1]$ tensor of shape `(4, 3, 32, 32)`.
+- [x] **2.1.** Implement `NormalizedModelWrapper(nn.Module)` in `src/models.py` so input tensors $x$ remain strictly in $[0.0, 1.0]$ and $(x - \mu)/\sigma$ normalization happens inside `forward()`.
+- [x] **2.2.** Implement loader for **`CNN-Clean`**: Load pretrained CIFAR-10 ResNet (`cifar10_resnet20` via `torch.hub.load("chenyaofo/pytorch-cifar-models", ...)`).
+- [x] **2.3.** Implement loader for **`ViT-Clean`**: Load pretrained CIFAR-10 Vision Transformer (`aaraki/vit-base-patch16-224-in21k-finetuned-cifar10` or `timm` small ViT with bilinear upsampling inside wrapper).
+- [x] **2.4.** Write a quick sanity test verifying both models output shape `(batch_size, 10)` on a dummy $[0, 1]$ tensor of shape `(4, 3, 32, 32)`. _(code: `python -m src.models`; NOT yet run: torch is blocked by Windows Application Control on the dev laptop, runs in Colab)_
 - [ ] **2.5. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
   ```bash
   ./scripts/auto_push.sh "feat(models): implement NormalizedModelWrapper and pretrained CIFAR-10 CNN & ViT loaders [Milestone 2]"
@@ -63,7 +63,7 @@ fi
   $$x_{\text{adv}} = \text{clip}_{[0, 1]}\big(x + \epsilon \cdot \text{sign}(\nabla_x \mathcal{L}(\theta, x, y))\big)$$
 - [ ] **3.2.** Implement `pgd_attack(model, x, y, eps, alpha, steps=10, random_start=True)` in `src/attacks.py` following Madry et al. (2018) with $\ell_\infty$ projection to $[x-\epsilon, x+\epsilon]$ and clamping to $[0, 1]$.
 - [ ] **3.3.** Implement `rs_fgsm_attack(model, x, y, eps, alpha)` (Fast Adversarial Training step with random initialization in $[-\epsilon, \epsilon]$).
-- [ ] **3.4.** Verify via unit assertion that `torch.max(torch.abs(x_adv - x)) <= eps + 1e-6` and `0.0 <= x_adv.min() <= x_adv.max() <= 1.0`.
+- [ ] **3.4.** Verify via unit assertion that `torch.max(torch.abs(x_adv - x)) <= eps + 1e-6` and `0.0 <= x_adv.min() <= x_adv.max() <= 1.0`. _(code: `python -m src.attacks`; NOT yet run, same reason)_
 - [ ] **3.5. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
   ```bash
   ./scripts/auto_push.sh "feat(attacks): implement FGSM, PGD-10, and RS-FGSM L-inf attacks in PyTorch [Milestone 3]"
