@@ -17,3 +17,5 @@ data/
 *.token
 
 # outputs/ (png, csv, md) and TASK.md are intentionally tracked.
+
+checkpoints_quick_test/

@@ -83,15 +83,15 @@ fi
 ---
 
 ## Milestone 5: Evaluation Pipeline & Visualization Suite (`src/evaluate.py` & `src/visualize.py`)
-- [ ] **5.1.** Implement `evaluate_epsilon_sweep()` in `src/evaluate.py` across $\epsilon \in \{0, \frac{1}{255}, \frac{2}{255}, \frac{4}{255}, \frac{8}{255}, \frac{16}{255}\}$ for both FGSM and PGD-10 on a stratified subset of $N=1000$ CIFAR-10 test images (`SEED=42`).
-- [ ] **5.2.** Implement `evaluate_transferability()` between `CNN-Clean`, `ViT-Clean`, `CNN-AdvTrained`, and `ViT-AdvTrained` at $\epsilon = 8/255$.
-- [ ] **5.3.** Implement `src/visualize.py` to generate all 4 required 300-DPI figures in `outputs/`:
+- [x] **5.1.** Implement `evaluate_epsilon_sweep()` in `src/evaluate.py` across $\epsilon \in \{0, \frac{1}{255}, \frac{2}{255}, \frac{4}{255}, \frac{8}{255}, \frac{16}{255}\}$ for both FGSM and PGD-10 on a stratified subset of $N=1000$ CIFAR-10 test images (`SEED=42`).
+- [x] **5.2.** Implement `evaluate_transferability()` between `CNN-Clean`, `ViT-Clean`, `CNN-AdvTrained`, and `ViT-AdvTrained` at $\epsilon = 8/255$.
+- [x] **5.3.** Implement `src/visualize.py` to generate all 4 required 300-DPI figures in `outputs/`:
   1. `outputs/acc_vs_epsilon.png` (FGSM & PGD-10 Accuracy vs. $\epsilon$ curves)
   2. `outputs/clean_vs_robust_tradeoff.png` (Bar chart of Clean Accuracy cost vs. Robust Accuracy gain)
   3. `outputs/transferability_heatmap.png` (Cross-architecture transfer matrix)
   4. `outputs/adversarial_examples_grid.png` (Visual grid of Clean, Magnified Noise, and Adversarial images)
-- [ ] **5.4.** Create `main.py` CLI entry point supporting `--quick-test` (CPU 2-minute smoke test on 64 images) and `--full-run` (Colab GPU 10-epoch run).
-- [ ] **5.5. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
+- [x] **5.4.** Create `main.py` CLI entry point supporting `--quick-test` (CPU 2-minute smoke test on 64 images) and `--full-run` (Colab GPU 10-epoch run).
+- [x] **5.5. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
   ```bash
   ./scripts/auto_push.sh "feat(eval): add epsilon-sweep evaluation, transferability matrix, and 4 plot generators [Milestone 5]"
   ```
