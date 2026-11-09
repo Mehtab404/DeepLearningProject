@@ -37,6 +37,29 @@ def load_json(path, default=None):
         return json.load(f)
 
 
+def _exclude_oversized_files(repo_dir, limit_mb=95):
+    """GitHub rejects files > 100MB. Add any .pth/.pt above `limit_mb` to .git/info/exclude."""
+    try:
+        exclude = os.path.join(repo_dir, ".git", "info", "exclude")
+        if not os.path.isdir(os.path.dirname(exclude)):
+            return
+        existing = open(exclude, encoding="utf-8").read() if os.path.exists(exclude) else ""
+        new = []
+        for root, _dirs, files in os.walk(os.path.join(repo_dir, "checkpoints")):
+            for f in files:
+                p = os.path.join(root, f)
+                if f.endswith((".pth", ".pt")) and os.path.getsize(p) > limit_mb * 1024 * 1024:
+                    rel = os.path.relpath(p, repo_dir).replace(os.sep, "/")
+                    if rel not in existing:
+                        new.append(rel)
+        if new:
+            with open(exclude, "a", encoding="utf-8") as fh:
+                fh.write("\n" + "\n".join(new) + "\n")
+            print(f"[AUTO-PUSH] Excluded from git (>{limit_mb}MB): {', '.join(new)}")
+    except OSError:
+        pass
+
+
 def git_auto_push(message: str, repo_dir: str = ".") -> bool:
     """Python equivalent of scripts/auto_push.sh. Never raises: training must not die on a git error.
 
@@ -50,6 +73,7 @@ def git_auto_push(message: str, repo_dir: str = ".") -> bool:
         if run("git", "rev-parse", "--is-inside-work-tree").returncode != 0:
             print("[AUTO-PUSH] Not a git repository, skipping.")
             return False
+        _exclude_oversized_files(repo_dir)
         run("git", "add", ".")
         if run("git", "diff", "--cached", "--quiet").returncode == 0:
             print("[AUTO-PUSH] No file changes to commit.")

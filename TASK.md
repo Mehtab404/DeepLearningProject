@@ -72,10 +72,10 @@ fi
 ---
 
 ## Milestone 4: 10-Epoch Fast Adversarial Fine-Tuning Loop (`src/defense.py`)
-- [ ] **4.1.** Implement `adversarial_finetune()` using Automatic Mixed Precision (`torch.cuda.amp.autocast()` + `GradScaler`) to keep total training time between **20 and 35 minutes** on Colab T4 (strictly $< 4\text{ hours}$).
-- [ ] **4.2.** Use combined loss $\mathcal{L}_{\text{total}} = 0.5 \cdot \mathcal{L}_{\text{CE}}(x_{\text{clean}}, y) + 0.5 \cdot \mathcal{L}_{\text{CE}}(x_{\text{adv}}, y)$ at $\epsilon = 8/255$ for 10 epochs so clean accuracy trade-off is controlled and measurable.
-- [ ] **4.3.** Add periodic checkpoint saving (`checkpoints/cnn_adv.pth`, `checkpoints/vit_adv.pth`, and `checkpoints/training_history.json`) after every epoch, plus an automatic Git commit/push hook every 5 epochs so progress is backed up to GitHub mid-training.
-- [ ] **4.4. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
+- [x] **4.1.** Implement `adversarial_finetune()` using Automatic Mixed Precision (`torch.cuda.amp.autocast()` + `GradScaler`) to keep total training time between **20 and 35 minutes** on Colab T4 (strictly $< 4\text{ hours}$). _(implemented; the 20-35 min runtime is a Colab T4 estimate and has NOT been measured yet)_
+- [x] **4.2.** Use combined loss $\mathcal{L}_{\text{total}} = 0.5 \cdot \mathcal{L}_{\text{CE}}(x_{\text{clean}}, y) + 0.5 \cdot \mathcal{L}_{\text{CE}}(x_{\text{adv}}, y)$ at $\epsilon = 8/255$ for 10 epochs so clean accuracy trade-off is controlled and measurable.
+- [x] **4.3.** Add periodic checkpoint saving (`checkpoints/cnn_adv.pth`, `checkpoints/vit_adv.pth`, and `checkpoints/training_history.json`) after every epoch, plus an automatic Git commit/push hook every 5 epochs so progress is backed up to GitHub mid-training.
+- [x] **4.4. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
   ```bash
   ./scripts/auto_push.sh "feat(defense): add 10-epoch AMP adversarial fine-tuning pipeline with periodic auto-save [Milestone 4]"
   ```
