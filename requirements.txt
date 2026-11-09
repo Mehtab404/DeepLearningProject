@@ -1,0 +1,9 @@
+torch
+torchvision
+timm
+transformers
+matplotlib
+seaborn
+tqdm
+pandas
+numpy

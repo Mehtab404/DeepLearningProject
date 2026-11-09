@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/
+.ipynb_checkpoints/
+.idea/
+.vscode/
+
+# GitHub rejects files > 100MB. ViT-Base checkpoints (~330MB) stay out of git;
+# store them on Google Drive / Git LFS. ResNet-20 checkpoints (~1MB) are tracked.
+checkpoints/vit_*.pth
+*.pt
+
+# Secrets
+.env
+*.token
+
+# outputs/ (png, csv, md) and TASK.md are intentionally tracked.
