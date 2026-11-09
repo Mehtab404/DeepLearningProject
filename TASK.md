@@ -39,7 +39,7 @@ fi
 - [x] **1.3.** Create `.gitignore` (ignoring `__pycache__/`, `.venv/`, `data/`, and single `.pth` files $>95\text{MB}$ while keeping `outputs/` and `TASK.md` tracked).
 - [x] **1.4.** Create `requirements.txt` (`torch`, `torchvision`, `timm`, `transformers`, `matplotlib`, `seaborn`, `tqdm`, `pandas`, `numpy`).
 - [x] **1.5.** Create `scripts/auto_push.sh` and make it executable (`chmod +x scripts/auto_push.sh`).
-- [ ] **1.6. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
+- [x] **1.6. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
   ```bash
   ./scripts/auto_push.sh "chore(init): setup project structure, requirements, and auto-push script [Milestone 1]"
   ```
@@ -51,7 +51,7 @@ fi
 - [x] **2.2.** Implement loader for **`CNN-Clean`**: Load pretrained CIFAR-10 ResNet (`cifar10_resnet20` via `torch.hub.load("chenyaofo/pytorch-cifar-models", ...)`).
 - [x] **2.3.** Implement loader for **`ViT-Clean`**: Load pretrained CIFAR-10 Vision Transformer (`aaraki/vit-base-patch16-224-in21k-finetuned-cifar10` or `timm` small ViT with bilinear upsampling inside wrapper).
 - [x] **2.4.** Write a quick sanity test verifying both models output shape `(batch_size, 10)` on a dummy $[0, 1]$ tensor of shape `(4, 3, 32, 32)`. _(code: `python -m src.models`; NOT yet run: torch is blocked by Windows Application Control on the dev laptop, runs in Colab)_
-- [ ] **2.5. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
+- [x] **2.5. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
   ```bash
   ./scripts/auto_push.sh "feat(models): implement NormalizedModelWrapper and pretrained CIFAR-10 CNN & ViT loaders [Milestone 2]"
   ```
@@ -59,12 +59,12 @@ fi
 ---
 
 ## Milestone 3: Native PyTorch FGSM & PGD Attacks (`src/attacks.py`)
-- [ ] **3.1.** Implement `fgsm_attack(model, x, y, eps)` in `src/attacks.py` following Goodfellow et al. (2015):
+- [x] **3.1.** Implement `fgsm_attack(model, x, y, eps)` in `src/attacks.py` following Goodfellow et al. (2015):
   $$x_{\text{adv}} = \text{clip}_{[0, 1]}\big(x + \epsilon \cdot \text{sign}(\nabla_x \mathcal{L}(\theta, x, y))\big)$$
-- [ ] **3.2.** Implement `pgd_attack(model, x, y, eps, alpha, steps=10, random_start=True)` in `src/attacks.py` following Madry et al. (2018) with $\ell_\infty$ projection to $[x-\epsilon, x+\epsilon]$ and clamping to $[0, 1]$.
-- [ ] **3.3.** Implement `rs_fgsm_attack(model, x, y, eps, alpha)` (Fast Adversarial Training step with random initialization in $[-\epsilon, \epsilon]$).
+- [x] **3.2.** Implement `pgd_attack(model, x, y, eps, alpha, steps=10, random_start=True)` in `src/attacks.py` following Madry et al. (2018) with $\ell_\infty$ projection to $[x-\epsilon, x+\epsilon]$ and clamping to $[0, 1]$.
+- [x] **3.3.** Implement `rs_fgsm_attack(model, x, y, eps, alpha)` (Fast Adversarial Training step with random initialization in $[-\epsilon, \epsilon]$).
 - [ ] **3.4.** Verify via unit assertion that `torch.max(torch.abs(x_adv - x)) <= eps + 1e-6` and `0.0 <= x_adv.min() <= x_adv.max() <= 1.0`. _(code: `python -m src.attacks`; NOT yet run, same reason)_
-- [ ] **3.5. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
+- [x] **3.5. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
   ```bash
   ./scripts/auto_push.sh "feat(attacks): implement FGSM, PGD-10, and RS-FGSM L-inf attacks in PyTorch [Milestone 3]"
   ```
