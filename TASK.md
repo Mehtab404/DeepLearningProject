@@ -50,7 +50,7 @@ fi
 - [x] **2.1.** Implement `NormalizedModelWrapper(nn.Module)` in `src/models.py` so input tensors $x$ remain strictly in $[0.0, 1.0]$ and $(x - \mu)/\sigma$ normalization happens inside `forward()`.
 - [x] **2.2.** Implement loader for **`CNN-Clean`**: Load pretrained CIFAR-10 ResNet (`cifar10_resnet20` via `torch.hub.load("chenyaofo/pytorch-cifar-models", ...)`).
 - [x] **2.3.** Implement loader for **`ViT-Clean`**: Load pretrained CIFAR-10 Vision Transformer (`aaraki/vit-base-patch16-224-in21k-finetuned-cifar10` or `timm` small ViT with bilinear upsampling inside wrapper).
-- [x] **2.4.** Write a quick sanity test verifying both models output shape `(batch_size, 10)` on a dummy $[0, 1]$ tensor of shape `(4, 3, 32, 32)`. _(code: `python -m src.models`; NOT yet run: torch is blocked by Windows Application Control on the dev laptop, runs in Colab)_
+- [x] **2.4.** Write a quick sanity test verifying both models output shape `(batch_size, 10)` on a dummy $[0, 1]$ tensor of shape `(4, 3, 32, 32)`. _(verified: `python -m src.models` passes in a CPU Docker container)_
 - [x] **2.5. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
   ```bash
   ./scripts/auto_push.sh "feat(models): implement NormalizedModelWrapper and pretrained CIFAR-10 CNN & ViT loaders [Milestone 2]"
@@ -63,7 +63,7 @@ fi
   $$x_{\text{adv}} = \text{clip}_{[0, 1]}\big(x + \epsilon \cdot \text{sign}(\nabla_x \mathcal{L}(\theta, x, y))\big)$$
 - [x] **3.2.** Implement `pgd_attack(model, x, y, eps, alpha, steps=10, random_start=True)` in `src/attacks.py` following Madry et al. (2018) with $\ell_\infty$ projection to $[x-\epsilon, x+\epsilon]$ and clamping to $[0, 1]$.
 - [x] **3.3.** Implement `rs_fgsm_attack(model, x, y, eps, alpha)` (Fast Adversarial Training step with random initialization in $[-\epsilon, \epsilon]$).
-- [ ] **3.4.** Verify via unit assertion that `torch.max(torch.abs(x_adv - x)) <= eps + 1e-6` and `0.0 <= x_adv.min() <= x_adv.max() <= 1.0`. _(code: `python -m src.attacks`; NOT yet run, same reason)_
+- [x] **3.4.** Verify via unit assertion that `torch.max(torch.abs(x_adv - x)) <= eps + 1e-6` and `0.0 <= x_adv.min() <= x_adv.max() <= 1.0`. _(verified: `python -m src.attacks` self-test passes in a CPU Docker container)_
 - [x] **3.5. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
   ```bash
   ./scripts/auto_push.sh "feat(attacks): implement FGSM, PGD-10, and RS-FGSM L-inf attacks in PyTorch [Milestone 3]"
@@ -100,7 +100,7 @@ fi
 
 ## Milestone 6: All-in-One Google Colab Notebook & Smoke Test Verification
 - [x] **6.1.** Generate `Adversarial_CNN_vs_ViT_Colab.ipynb` containing the entire self-contained pipeline, including an optional cell at the top to configure a GitHub Personal Access Token (`GITHUB_TOKEN`) so Colab automatically pushes checkpoints, CSVs, and PNG plots back to the GitHub repo after each stage finishes.
-- [ ] **6.2.** Run `python main.py --quick-test` locally to verify zero syntax/runtime errors and generate initial baseline artifacts in `outputs/`. _(BLOCKED locally: Windows Application Control blocks torch.dll/pandas DLLs on this laptop and Docker is stopped. Not run. Use the notebook with RUN_QUICK_TEST = True on Colab.)_
+- [x] **6.2.** Run `python main.py --quick-test` locally to verify zero syntax/runtime errors and generate initial baseline artifacts in `outputs/`. _(verified in a CPU Docker container, not natively: torch is blocked by Windows Application Control on this laptop. Ran in ~3-4 min; outputs/ now holds QUICK-TEST artifacts, watermarked "not a result", to be overwritten by the Milestone 7 GPU run.)_
 - [x] **6.3.** Update `README.md` with embedded links to `outputs/acc_vs_epsilon.png`, `outputs/clean_vs_robust_tradeoff.png`, `outputs/transferability_heatmap.png`, and `outputs/adversarial_examples_grid.png`, along with the research findings summary.
 - [x] **6.4. [AUTO-PUSH TRIGGER]:** Update `TASK.md` checkboxes `[x]` and run:
   ```bash

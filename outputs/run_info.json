@@ -1,0 +1,17 @@
+{
+  "mode": "quick-test",
+  "device": "cpu",
+  "epochs": 1,
+  "eval_samples": 60,
+  "pgd_eval_steps": 2,
+  "cnn_method": "pgd5",
+  "vit_method": "rs_fgsm",
+  "vit_backbone": "timm-tiny",
+  "clean_acc_full_subset": {
+    "CNN-Clean": 88.33333333333333,
+    "ViT-Clean": 30.0,
+    "CNN-AdvTrained": 93.33333333333333,
+    "ViT-AdvTrained": 31.666666666666668
+  },
+  "total_minutes": 3.05
+}

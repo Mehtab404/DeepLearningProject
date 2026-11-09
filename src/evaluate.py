@@ -97,8 +97,8 @@ def export_results(sweep_df, transfer_df, out_dir, note=""):
     sweep_df.to_csv(os.path.join(out_dir, "results_summary.csv"), index=False)
     wide = sweep_df.pivot_table(index=["attack", "model"], columns="eps_255", values="accuracy", sort=False)
     wide.columns = [f"eps={c}/255" for c in wide.columns]
-    wide.index = [f"{a} | {m}" for a, m in wide.index]
-    wide.index.name = "attack | model"
+    wide.index = [f"{a}, {m}" for a, m in wide.index]   # no '|' here: it would break the markdown table
+    wide.index.name = "attack, model"
     md = ["# Results summary (accuracy %, white-box)", ""]
     if note:
         md += [f"> {note}", ""]
