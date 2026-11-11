@@ -110,11 +110,11 @@ fi
 ---
 
 ## Milestone 7: Full GPU Execution & Final Results Auto-Push (Colab / Kaggle Run)
-- [ ] **7.1.** Execute 10-epoch Adversarial Fine-Tuning for `CNN-AdvTrained` $\to$ auto-push `checkpoints/training_history.json` to GitHub.
-- [ ] **7.2.** Execute 10-epoch Adversarial Fine-Tuning for `ViT-AdvTrained` $\to$ auto-push `checkpoints/training_history.json` to GitHub.
-- [ ] **7.3.** Run full $N=1000$ FGSM & PGD-10 $\epsilon$-sweep and export `outputs/results_summary.csv` and `outputs/results_summary.md`.
-- [ ] **7.4.** Generate final high-resolution plots in `outputs/*.png`.
-- [ ] **7.5. [FINAL AUTO-PUSH TRIGGER]:** Mark all tasks `[x]` in `TASK.md` and run:
+- [x] **7.1.** Execute 10-epoch Adversarial Fine-Tuning for `CNN-AdvTrained` $\to$ auto-push `checkpoints/training_history.json` to GitHub.
+- [x] **7.2.** Execute 10-epoch Adversarial Fine-Tuning for `ViT-AdvTrained` $\to$ auto-push `checkpoints/training_history.json` to GitHub. _(done in Colab T4, RS-FGSM for the ViT per spec option; see README: the ViT shows signs of catastrophic overfitting, a PGD-5 re-run is recommended for a fair CNN-vs-ViT comparison. Results were downloaded and committed manually, no GITHUB_TOKEN was used.)_
+- [x] **7.3.** Run full $N=1000$ FGSM & PGD-10 $\epsilon$-sweep and export `outputs/results_summary.csv` and `outputs/results_summary.md`.
+- [x] **7.4.** Generate final high-resolution plots in `outputs/*.png`.
+- [x] **7.5. [FINAL AUTO-PUSH TRIGGER]:** Mark all tasks `[x]` in `TASK.md` and run:
   ```bash
   ./scripts/auto_push.sh "results(final): push complete CIFAR-10 CNN vs ViT robustness metrics and 300-DPI plots [Milestone 7]"
   ```
