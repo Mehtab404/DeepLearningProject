@@ -1,10 +1,44 @@
 """CIFAR-10 data loading. Tensors stay in [0, 1] (ToTensor only); normalisation lives in the model."""
+import os
+import shutil
+import time
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
 from .utils import SEED
+
+CIFAR_TAR = "cifar-10-python.tar.gz"
+
+
+def prepare_data(root="data", drive_dir=None, attempts=3):
+    """Make sure CIFAR-10 is on disk, with retries and an optional Google Drive cache.
+
+    The official host can be very slow (a Colab run measured ~60 kB/s, i.e. ~47 min for 170 MB), so the
+    archive is cached in <drive_dir>/dataset/ and restored from there on later runs.
+    """
+    dst = os.path.join(root, CIFAR_TAR)
+    cached = os.path.join(drive_dir, "dataset", CIFAR_TAR) if drive_dir else None
+    os.makedirs(root, exist_ok=True)
+    if cached and not os.path.exists(dst) and os.path.exists(cached):
+        shutil.copy2(cached, dst)
+        print("[data] restored CIFAR-10 archive from Drive cache")
+    for i in range(1, attempts + 1):
+        try:
+            datasets.CIFAR10(root=root, train=True, download=True)
+            datasets.CIFAR10(root=root, train=False, download=True)
+            break
+        except Exception as e:  # noqa: BLE001
+            if i == attempts:
+                raise
+            print(f"[retry] CIFAR-10 download failed ({type(e).__name__}); attempt {i}/{attempts}")
+            time.sleep(10 * i)
+    if cached and os.path.exists(dst) and not os.path.exists(cached):
+        os.makedirs(os.path.dirname(cached), exist_ok=True)
+        shutil.copy2(dst, cached)
+        print("[data] cached CIFAR-10 archive to Drive")
 
 
 def get_train_loader(batch_size=128, root="data", max_samples=0, augment=True, num_workers=2, seed=SEED):

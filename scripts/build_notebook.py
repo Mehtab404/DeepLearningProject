@@ -120,8 +120,7 @@ self_test()
 
 QUICK = """
 if RUN_QUICK_TEST:
-    extra = f"--drive-dir '{DRIVE_DIR}'" if DRIVE_DIR else ""
-    !python main.py --quick-test {extra}
+    !python main.py --quick-test
 """
 
 RUN = """
@@ -133,7 +132,10 @@ if AUTO_PUSH: extra += " --auto-push"
 """
 
 SHOW = """
+import json
 from IPython.display import Image, Markdown, display
+info = json.load(open("outputs/run_info.json"))
+assert info["mode"] == "full-run", "outputs/ holds a quick-test run, not full-run results. Re-run the training cell."
 for f in ["acc_vs_epsilon", "clean_vs_robust_tradeoff", "transferability_heatmap", "adversarial_examples_grid"]:
     display(Image(filename=f"outputs/{f}.png"))
 display(Markdown(open("outputs/results_summary.md", encoding="utf-8").read()))

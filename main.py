@@ -12,11 +12,12 @@ import json
 import os
 import time
 
-from src.data import get_eval_tensors, get_train_loader
+from src.data import get_eval_tensors, get_train_loader, prepare_data
 from src.defense import adversarial_finetune, clean_finetune, is_training_complete
 from src.evaluate import accuracy, evaluate_epsilon_sweep, evaluate_transferability, export_results
 from src.models import load_checkpoint, load_cnn_clean, load_vit_clean, save_checkpoint
-from src.utils import SEED, get_device, git_auto_push, restore_from_drive, save_json, set_seed, sync_to_drive
+from src.utils import (SEED, get_device, git_auto_push, load_json, restore_from_drive, save_json, set_seed,
+                       sync_to_drive)
 from src.visualize import make_all_plots
 
 
@@ -46,6 +47,20 @@ def parse_args():
     return p.parse_args()
 
 
+def clear_stale_quick_test_outputs(out_dir):
+    """Quick-test artifacts are committed to git; delete them so they can never pass for full-run results."""
+    info = load_json(os.path.join(out_dir, "run_info.json"), {}) or {}
+    if info.get("mode") != "quick-test":
+        return
+    for name in ("acc_vs_epsilon.png", "clean_vs_robust_tradeoff.png", "transferability_heatmap.png",
+                 "adversarial_examples_grid.png", "results_summary.csv", "results_summary.md",
+                 "transferability.csv", "run_info.json"):
+        p = os.path.join(out_dir, name)
+        if os.path.exists(p):
+            os.remove(p)
+    print("[outputs] removed stale quick-test artifacts")
+
+
 def main():
     args = parse_args()
     quick = args.quick_test
@@ -56,6 +71,7 @@ def main():
     if quick:
         args.epochs, args.eval_samples, args.batch_size = 1, 64, 16
         args.max_train_samples, args.vit_clean_epochs, args.num_workers = 64, 1, 0
+        args.drive_dir = None   # never mix throw-away smoke-test checkpoints into the real Drive cache
         pgd_steps, max_batches = 2, 2
         tag = "QUICK-TEST smoke run (tiny N, 1 epoch, 2 PGD steps) - not a result"
     args.ckpt_dir = args.ckpt_dir or ("checkpoints_quick_test" if quick else "checkpoints")
@@ -68,12 +84,14 @@ def main():
         print("WARNING: full-run on CPU will be extremely slow. Use Colab/Kaggle GPU (or --quick-test).")
 
     restore_from_drive(args.ckpt_dir, args.drive_dir)
+    if not quick:
+        clear_stale_quick_test_outputs(args.out_dir)
     push = (lambda msg: git_auto_push(msg)) if args.auto_push else (lambda msg: None)
     t_start = time.time()
 
-    # Stage 1: clean baselines (pretrained, no/little training)
-    train_loader = get_train_loader(args.batch_size, args.data_root, args.max_train_samples,
-                                    num_workers=args.num_workers)
+    # Stage 1: clean baselines (pretrained, no/little training).
+    # Models are loaded BEFORE the dataset so a network/hub failure shows up in seconds, not after a
+    # long CIFAR-10 download.
     cnn_path = os.path.join(args.ckpt_dir, "cnn_clean.pth")
     vit_path = os.path.join(args.ckpt_dir, "vit_clean.pth")
 
@@ -84,16 +102,22 @@ def main():
         cnn_clean = load_cnn_clean(device)
         save_checkpoint(cnn_clean, cnn_path)
 
+    vit_needs_ft = False
     if os.path.exists(vit_path):
         shell, _ = load_vit_clean(device, args.vit_backbone, pretrained=False)
         vit_clean = load_checkpoint(shell, vit_path, device)
         print("[ViT-Clean] loaded from checkpoint")
     else:
-        vit_clean, needs_ft = load_vit_clean(device, args.vit_backbone)
-        if needs_ft:
-            print(f"[ViT-Clean] clean fine-tune on CIFAR-10 for {args.vit_clean_epochs} epochs")
-            clean_finetune(vit_clean, train_loader, epochs=args.vit_clean_epochs, device=device,
-                           max_batches=max_batches)
+        vit_clean, vit_needs_ft = load_vit_clean(device, args.vit_backbone)
+
+    prepare_data(args.data_root, args.drive_dir)
+    train_loader = get_train_loader(args.batch_size, args.data_root, args.max_train_samples,
+                                    num_workers=args.num_workers)
+
+    if vit_needs_ft:
+        print(f"[ViT-Clean] clean fine-tune on CIFAR-10 for {args.vit_clean_epochs} epochs")
+        clean_finetune(vit_clean, train_loader, epochs=args.vit_clean_epochs, device=device,
+                       max_batches=max_batches)
         save_checkpoint(vit_clean, vit_path)
     sync_to_drive(args.ckpt_dir, args.drive_dir)
     push("chore(train): clean CNN/ViT baseline checkpoints")

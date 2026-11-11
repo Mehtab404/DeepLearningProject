@@ -5,6 +5,7 @@ Golden rule: every tensor that reaches an attack lives in [0, 1]. The (x - mean)
 are exact in pixel space for every architecture.
 """
 import os
+import time
 
 import torch
 import torch.nn as nn
@@ -17,6 +18,21 @@ CIFAR10_CLASSES = ["airplane", "automobile", "bird", "cat", "deer",
                    "dog", "frog", "horse", "ship", "truck"]
 
 HF_VIT_ID = "aaraki/vit-base-patch16-224-in21k-finetuned-cifar10"
+HUB_REPO = "chenyaofo/pytorch-cifar-models:master"
+
+
+def _with_retries(fn, what="download", attempts=5, base_delay=5):
+    """Run fn(); retry transient network failures (HTTP 5xx, timeouts) with a growing delay."""
+    for i in range(1, attempts + 1):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001 - urllib/requests/hub raise many different error types
+            if i == attempts:
+                raise
+            wait = base_delay * i
+            print(f"[retry] {what} failed ({type(e).__name__}: {str(e)[:120]}); attempt {i}/{attempts}, "
+                  f"retrying in {wait}s")
+            time.sleep(wait)
 
 
 class NormalizedModelWrapper(nn.Module):
@@ -41,7 +57,10 @@ def load_cnn_clean(device, pretrained=True, arch="cifar10_resnet20"):
     pretrained=False builds the same architecture without downloading weights (used when a local
     checkpoint will be loaded on top).
     """
-    base = torch.hub.load("chenyaofo/pytorch-cifar-models", arch, pretrained=pretrained, trust_repo=True)
+    # ":master" pins the branch. Without it torch.hub first probes github.com/<repo>/tree/main/ to guess
+    # the default branch, and a transient GitHub 5xx on that probe crashed a full Colab run.
+    base = _with_retries(lambda: torch.hub.load(HUB_REPO, arch, pretrained=pretrained, trust_repo=True),
+                         what="torch.hub " + arch)
     model = NormalizedModelWrapper(base, CIFAR_MEAN, CIFAR_STD, img_size=None)
     return model.to(device).eval()
 
@@ -60,12 +79,15 @@ def load_vit_clean(device, backbone="timm-tiny", pretrained=True):
     mean, std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
     if backbone == "timm-tiny":
         import timm
-        base = timm.create_model("vit_tiny_patch16_224", pretrained=pretrained, num_classes=10)
+        base = _with_retries(
+            lambda: timm.create_model("vit_tiny_patch16_224", pretrained=pretrained, num_classes=10),
+            what="timm vit_tiny weights")
         needs_ft = pretrained  # when pretrained=False we only build the shell for a local checkpoint
     elif backbone == "hf-base":
         from transformers import AutoConfig, ViTForImageClassification
         if pretrained:
-            base = ViTForImageClassification.from_pretrained(HF_VIT_ID)
+            base = _with_retries(lambda: ViTForImageClassification.from_pretrained(HF_VIT_ID),
+                                 what="HF ViT-Base weights")
         else:
             base = ViTForImageClassification(AutoConfig.from_pretrained(HF_VIT_ID))
         needs_ft = False
