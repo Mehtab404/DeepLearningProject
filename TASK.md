@@ -111,7 +111,7 @@ fi
 
 ## Milestone 7: Full GPU Execution & Final Results Auto-Push (Colab / Kaggle Run)
 - [x] **7.1.** Execute 10-epoch Adversarial Fine-Tuning for `CNN-AdvTrained` $\to$ auto-push `checkpoints/training_history.json` to GitHub.
-- [x] **7.2.** Execute 10-epoch Adversarial Fine-Tuning for `ViT-AdvTrained` $\to$ auto-push `checkpoints/training_history.json` to GitHub. _(done in Colab T4, RS-FGSM for the ViT per spec option; see README: the ViT shows signs of catastrophic overfitting, a PGD-5 re-run is recommended for a fair CNN-vs-ViT comparison. Results were downloaded and committed manually, no GITHUB_TOKEN was used.)_
+- [x] **7.2.** Execute 10-epoch Adversarial Fine-Tuning for `ViT-AdvTrained` $\to$ auto-push `checkpoints/training_history.json` to GitHub. _(done in Colab T4. First run used RS-FGSM for the ViT; it showed signs of catastrophic overfitting (FGSM 79.8% vs PGD-10 4.9% at 8/255), so the ViT was re-trained with PGD-5 for a fair comparison with the CNN (PGD-10 at 8/255: 42.2%, 74.7 min). The RS-FGSM results are kept in `outputs_vit_rsfgsm/`. Results were downloaded and committed manually, no GITHUB_TOKEN was used.)_
 - [x] **7.3.** Run full $N=1000$ FGSM & PGD-10 $\epsilon$-sweep and export `outputs/results_summary.csv` and `outputs/results_summary.md`.
 - [x] **7.4.** Generate final high-resolution plots in `outputs/*.png`.
 - [x] **7.5. [FINAL AUTO-PUSH TRIGGER]:** Mark all tasks `[x]` in `TASK.md` and run:

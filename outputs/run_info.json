@@ -5,13 +5,13 @@
   "eval_samples": 1000,
   "pgd_eval_steps": 10,
   "cnn_method": "pgd5",
-  "vit_method": "rs_fgsm",
+  "vit_method": "pgd5",
   "vit_backbone": "timm-tiny",
   "clean_acc_full_subset": {
     "CNN-Clean": 91.5,
-    "ViT-Clean": 97.4,
+    "ViT-Clean": 97.1,
     "CNN-AdvTrained": 88.4,
-    "ViT-AdvTrained": 97.4
+    "ViT-AdvTrained": 94.1
   },
-  "total_minutes": 70.19
+  "total_minutes": 111.05
 }

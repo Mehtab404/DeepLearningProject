@@ -30,8 +30,9 @@ def parse_args():
     p.add_argument("--eval-samples", type=int, default=1000, help="stratified test subset size")
     p.add_argument("--eps", type=float, default=8.0, help="training epsilon in /255 units")
     p.add_argument("--cnn-method", choices=["pgd5", "rs_fgsm"], default="pgd5")
-    p.add_argument("--vit-method", choices=["pgd5", "rs_fgsm"], default="rs_fgsm",
-                   help="rs_fgsm keeps ViT adversarial training inside the Colab T4 time budget")
+    p.add_argument("--vit-method", choices=["pgd5", "rs_fgsm"], default="pgd5",
+                   help="pgd5 matches the CNN (fair comparison). rs_fgsm is ~2.5x faster but the ViT showed "
+                        "signs of catastrophic overfitting with it (see outputs_vit_rsfgsm/)")
     p.add_argument("--vit-backbone", choices=["timm-tiny", "hf-base"], default="timm-tiny")
     p.add_argument("--vit-clean-epochs", type=int, default=5, help="clean fine-tune epochs for timm ViT-Tiny")
     p.add_argument("--lr", type=float, default=1e-4)
