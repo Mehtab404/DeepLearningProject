@@ -9,10 +9,13 @@ import sys
 import numpy as np
 import torch
 
+# One fixed random seed for the whole project, so results can be reproduced.
 SEED = 42
 
 
 def set_seed(seed: int = SEED):
+    # Python, NumPy and PyTorch each have their own random number generator. Seeding all of them
+    # makes shuffling, random crops and attack random starts the same on every run.
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -21,16 +24,19 @@ def set_seed(seed: int = SEED):
 
 
 def get_device() -> torch.device:
+    # Use the GPU ("cuda") if there is one, otherwise the CPU.
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def save_json(obj, path):
+    # Write a Python dict/list to a readable JSON file (creates the folder if needed).
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2)
 
 
 def load_json(path, default=None):
+    # Read a JSON file. If it does not exist yet, return `default` instead of crashing.
     if not os.path.exists(path):
         return default
     with open(path, "r", encoding="utf-8") as f:
@@ -39,12 +45,14 @@ def load_json(path, default=None):
 
 def _exclude_oversized_files(repo_dir, limit_mb=95):
     """GitHub rejects files > 100MB. Add any .pth/.pt above `limit_mb` to .git/info/exclude."""
+    # .git/info/exclude works like .gitignore but stays local (it is never committed).
     try:
         exclude = os.path.join(repo_dir, ".git", "info", "exclude")
         if not os.path.isdir(os.path.dirname(exclude)):
             return
         existing = open(exclude, encoding="utf-8").read() if os.path.exists(exclude) else ""
         new = []
+        # Walk through every file in checkpoints/ and collect the ones that are too big.
         for root, _dirs, files in os.walk(os.path.join(repo_dir, "checkpoints")):
             for f in files:
                 p = os.path.join(root, f)
@@ -65,8 +73,10 @@ def git_auto_push(message: str, repo_dir: str = ".") -> bool:
 
     Stages everything, commits if there is something to commit, and pushes HEAD to origin.
     """
+    # Used with --auto-push: saves progress to GitHub during long Colab runs.
 
     def run(*cmd):
+        # Run a terminal command (e.g. git status) and capture its output instead of printing it.
         return subprocess.run(cmd, cwd=repo_dir, capture_output=True, text=True)
 
     try:
@@ -75,6 +85,7 @@ def git_auto_push(message: str, repo_dir: str = ".") -> bool:
             return False
         _exclude_oversized_files(repo_dir)
         run("git", "add", ".")
+        # "git diff --cached --quiet" returns 0 when nothing is staged -> nothing to commit.
         if run("git", "diff", "--cached", "--quiet").returncode == 0:
             print("[AUTO-PUSH] No file changes to commit.")
             return True
@@ -96,8 +107,9 @@ def git_auto_push(message: str, repo_dir: str = ".") -> bool:
 
 def sync_to_drive(src_dir: str, drive_dir: str):
     """Copy a directory tree (e.g. checkpoints/) to Google Drive so a disconnect never loses work."""
+    # Colab deletes local files when the session ends; Google Drive keeps them.
     if not drive_dir:
-        return
+        return    # not on Colab / no Drive folder given -> do nothing
     try:
         os.makedirs(drive_dir, exist_ok=True)
         for name in os.listdir(src_dir):
@@ -110,6 +122,7 @@ def sync_to_drive(src_dir: str, drive_dir: str):
 
 def restore_from_drive(dest_dir: str, drive_dir: str):
     """Copy files from Drive into dest_dir if they are not already there."""
+    # The opposite of sync_to_drive: at the start of a new Colab session, bring back saved checkpoints.
     if not drive_dir or not os.path.isdir(drive_dir):
         return
     os.makedirs(dest_dir, exist_ok=True)

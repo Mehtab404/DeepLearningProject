@@ -6,6 +6,13 @@
 
 Checkpoints in checkpoints/ are reused automatically: nothing that already exists is retrained.
 """
+# ---------------------------------------------------------------------------------------------------
+# PIPELINE OVERVIEW (this file connects all the modules in src/)
+#   Stage 1  Load the two clean (normally trained) models: CNN (ResNet-20) and ViT (ViT-Tiny).
+#   Stage 2  Adversarially fine-tune a copy of each one          -> 4 models in total.
+#   Stage 3  Attack all 4 models (FGSM, PGD-10) at several eps and measure accuracy; transfer test.
+#   Stage 4  Save tables (outputs/*.csv, *.md) and figures (outputs/*.png).
+# ---------------------------------------------------------------------------------------------------
 import argparse
 import copy
 import json
@@ -22,10 +29,14 @@ from src.visualize import make_all_plots
 
 
 def parse_args():
+    # Reads the command-line options, e.g. "python main.py --epochs 5 --eps 4".
+    # Every option has a default, so "python main.py" alone also works.
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    # --quick-test and --full-run cannot be used together.
     mode = p.add_mutually_exclusive_group()
     mode.add_argument("--quick-test", action="store_true", help="CPU smoke test: 64 images, 1 short epoch")
     mode.add_argument("--full-run", action="store_true", help="Full GPU run (default when no mode is given)")
+    # Training settings
     p.add_argument("--epochs", type=int, default=10, help="adversarial fine-tuning epochs")
     p.add_argument("--eval-samples", type=int, default=1000, help="stratified test subset size")
     p.add_argument("--eps", type=float, default=8.0, help="training epsilon in /255 units")
@@ -39,10 +50,12 @@ def parse_args():
     p.add_argument("--batch-size", type=int, default=128)
     p.add_argument("--max-train-samples", type=int, default=0, help="0 = full 50k training set")
     p.add_argument("--num-workers", type=int, default=2)
+    # Folders
     p.add_argument("--data-root", default="data")
     p.add_argument("--ckpt-dir", default=None)
     p.add_argument("--out-dir", default="outputs")
     p.add_argument("--drive-dir", default=None, help="e.g. /content/drive/MyDrive/adv_ckpts (Colab)")
+    # Behaviour flags
     p.add_argument("--force-retrain", action="store_true", help="ignore existing adversarial checkpoints")
     p.add_argument("--auto-push", action="store_true", help="git commit+push after each stage / every 5 epochs")
     return p.parse_args()
@@ -50,6 +63,8 @@ def parse_args():
 
 def clear_stale_quick_test_outputs(out_dir):
     """Quick-test artifacts are committed to git; delete them so they can never pass for full-run results."""
+    # run_info.json records which mode created the outputs. If it was a quick test, delete those files
+    # before a real run so fake numbers are never mixed with real ones.
     info = load_json(os.path.join(out_dir, "run_info.json"), {}) or {}
     if info.get("mode") != "quick-test":
         return
@@ -65,9 +80,11 @@ def clear_stale_quick_test_outputs(out_dir):
 def main():
     args = parse_args()
     quick = args.quick_test
-    device = get_device()
-    set_seed(SEED)
+    device = get_device()    # GPU if available, else CPU
+    set_seed(SEED)           # reproducible results
 
+    # Quick-test mode shrinks everything so the whole pipeline runs in a few minutes on a CPU.
+    # It only checks that the code works; its numbers mean nothing.
     pgd_steps, max_batches, tag = 10, 0, ""
     if quick:
         args.epochs, args.eval_samples, args.batch_size = 1, 64, 16
@@ -75,10 +92,11 @@ def main():
         args.drive_dir = None   # never mix throw-away smoke-test checkpoints into the real Drive cache
         pgd_steps, max_batches = 2, 2
         tag = "QUICK-TEST smoke run (tiny N, 1 epoch, 2 PGD steps) - not a result"
+    # Quick-test checkpoints go to a separate folder so they never overwrite the real ones.
     args.ckpt_dir = args.ckpt_dir or ("checkpoints_quick_test" if quick else "checkpoints")
     os.makedirs(args.ckpt_dir, exist_ok=True)
     os.makedirs(args.out_dir, exist_ok=True)
-    eps_train = args.eps / 255.0
+    eps_train = args.eps / 255.0    # e.g. 8 -> 0.0314 (pixels are in [0, 1])
 
     print(f"Device: {device} | mode: {'quick-test' if quick else 'full-run'} | ckpt: {args.ckpt_dir}")
     if device.type == "cpu" and not quick:
@@ -87,6 +105,7 @@ def main():
     restore_from_drive(args.ckpt_dir, args.drive_dir)
     if not quick:
         clear_stale_quick_test_outputs(args.out_dir)
+    # push(...) commits to GitHub only when --auto-push is given; otherwise it does nothing.
     push = (lambda msg: git_auto_push(msg)) if args.auto_push else (lambda msg: None)
     t_start = time.time()
 
@@ -96,6 +115,8 @@ def main():
     cnn_path = os.path.join(args.ckpt_dir, "cnn_clean.pth")
     vit_path = os.path.join(args.ckpt_dir, "vit_clean.pth")
 
+    # If a saved checkpoint exists, build an empty model (pretrained=False) and load our weights into it.
+    # Otherwise download the pretrained weights and save them.
     if os.path.exists(cnn_path):
         cnn_clean = load_checkpoint(load_cnn_clean(device, pretrained=False), cnn_path, device)
         print("[CNN-Clean] loaded from checkpoint")
@@ -115,6 +136,7 @@ def main():
     train_loader = get_train_loader(args.batch_size, args.data_root, args.max_train_samples,
                                     num_workers=args.num_workers)
 
+    # The ImageNet ViT-Tiny has a new 10-class head, so it first gets a normal (clean) fine-tune on CIFAR-10.
     if vit_needs_ft:
         print(f"[ViT-Clean] clean fine-tune on CIFAR-10 for {args.vit_clean_epochs} epochs")
         clean_finetune(vit_clean, train_loader, epochs=args.vit_clean_epochs, device=device,
@@ -126,9 +148,12 @@ def main():
     # Stage 2: adversarial fine-tuning (skipped if already completed)
     hist_path = os.path.join(args.ckpt_dir, "training_history.json")
     adv_models = {}
+    # The same loop handles both architectures: (file tag, clean model, training attack, display name).
     for tag_name, clean, method, label in (("cnn_adv", cnn_clean, args.cnn_method, "CNN-AdvTrained"),
                                            ("vit_adv", vit_clean, args.vit_method, "ViT-AdvTrained")):
         ckpt = os.path.join(args.ckpt_dir, f"{tag_name}.pth")
+        # deepcopy = a fully independent copy. Training the copy leaves the clean model unchanged,
+        # so we can still compare "before" and "after".
         model = copy.deepcopy(clean)
         if (os.path.exists(ckpt) and not args.force_retrain
                 and is_training_complete(hist_path, tag_name, args.epochs)):
@@ -137,6 +162,7 @@ def main():
         else:
             print(f"[{label}] adversarial fine-tuning: {args.epochs} epochs, {method}, eps={args.eps}/255")
             if args.force_retrain:
+                # Delete old files so training really starts from scratch (no resume).
                 for f in (ckpt, os.path.join(args.ckpt_dir, f"{tag_name}_state.pt")):
                     if os.path.exists(f):
                         os.remove(f)
@@ -147,6 +173,7 @@ def main():
             push(f"chore(train): {label} {args.epochs}-epoch adversarial fine-tuning finished")
         adv_models[label] = model.eval()
 
+    # The four models that are compared. "**adv_models" adds the two adversarially trained ones.
     models = {"CNN-Clean": cnn_clean, "ViT-Clean": vit_clean, **adv_models}
     # Freeze weights: attacks only need gradients w.r.t. the input, which saves memory and time.
     for m in models.values():
@@ -154,6 +181,7 @@ def main():
             prm.requires_grad_(False)   # attacks need input grads only
 
     # Stage 3: evaluation
+    # X = test images, Y = true labels (same fixed subset for every model).
     X, Y = get_eval_tensors(args.eval_samples, args.data_root)
     print(f"Evaluation subset: {len(X)} stratified test images (seed {SEED})")
     sweep = evaluate_epsilon_sweep(models, X, Y, device, pgd_steps=pgd_steps)
@@ -165,6 +193,7 @@ def main():
     # Stage 4: figures
     make_all_plots(sweep, transfer, models, X, Y, device, args.out_dir, pgd_steps=pgd_steps, tag=tag)
 
+    # Save a record of the settings used and the clean accuracy of each model (outputs/run_info.json).
     info = {"mode": "quick-test" if quick else "full-run", "device": str(device), "epochs": args.epochs,
             "eval_samples": len(X), "pgd_eval_steps": pgd_steps, "cnn_method": args.cnn_method,
             "vit_method": args.vit_method, "vit_backbone": args.vit_backbone,
@@ -176,5 +205,6 @@ def main():
     print(f"Done in {info['total_minutes']} min. Outputs in {args.out_dir}/")
 
 
+# Runs main() only when this file is started directly (python main.py).
 if __name__ == "__main__":
     main()
