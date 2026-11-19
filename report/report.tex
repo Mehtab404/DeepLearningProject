@@ -11,6 +11,7 @@
 \usepackage[english]{babel}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
+\usepackage{url}
 
 \newcommand{\Runo}{\rm I\hspace{-0.55ex}R}
 
@@ -22,18 +23,26 @@
 \newcommand{\num}{0}            % Number (default 0)
 \setcounter{page}{1}            % First page (default 1)
 \newcommand{\begpag}{\thepage}
-\newcommand{\finpag}{10}        % Last Page (update after compiling)
+\newcommand{\finpag}{9}         % Last Page (update after compiling)
 \newcommand{\yearp}{2026}       % Year
 %------------------------------------------------------------------
 \renewcommand{\thefootnote}{\fnsymbol{footnote}}
 
 \title{Adversarial Attacks and Defences: CNN vs Vision Transformer
 Robustness on CIFAR-10
-\footnote[0]{Correspondence to: $<$YOUR E-MAIL$>$ \vspace{0.2cm}}
+\footnote[0]{\raggedright Correspondence to: \texttt{su-24062@sitare.org}, \texttt{su-24055@sitare.org},\\ \texttt{su-24075@sitare.org}, \texttt{su-24076@sitare.org} \vspace{0.2cm}}
 }
 
-\author{YOUR NAME$^*$ \\ \\
-\centerline{\small \em $^*$ YOUR DEPARTMENT, YOUR UNIVERSITY, City, Country} \\ \\
+\author{
+\begin{tabular}{cc}
+Jamal Akhtar$^*$                  & Himanshu Srivastav$^*$            \\
+{\small 202410101200061}          & {\small 202410101200055}          \\
+{\small \texttt{su-24062@sitare.org}} & {\small \texttt{su-24055@sitare.org}} \\[3mm]
+Mayank Raj$^*$                    & Mehtab Alam$^*$                   \\
+{\small 202410101200076}          & {\small 202410101200075}          \\
+{\small \texttt{su-24075@sitare.org}} & {\small \texttt{su-24076@sitare.org}} \\
+\end{tabular} \\ \\
+\centerline{\small \em $^*$ Sitare University, Lucknow, India} \\ \\
 \centerline{\small Course project report, November 2026}
        }
 
@@ -43,10 +52,8 @@ Robustness on CIFAR-10
 
 \pagestyle{myheadings}
 
-\markboth{\centerline{\small \it YOUR NAME /
-           Adversarial Attacks and Defences: CNN vs ViT Robustness}}
-         {\centerline{\small \it YOUR NAME /
-           Adversarial Attacks and Defences: CNN vs ViT Robustness}}
+\markboth{\centerline{\small \it Adversarial Attacks and Defences: CNN vs ViT Robustness}}
+         {\centerline{\small \it Adversarial Attacks and Defences: CNN vs ViT Robustness}}
 \hrulefill
 
 \begin{abstract}
@@ -116,7 +123,7 @@ single-step attack looks robust under FGSM but is not robust under PGD.
 \end{itemize}
 
 All code, checkpoints and result tables are available at
-\texttt{https://github.com/Mehtab404/DeepLearningProject}.
+\url{https://github.com/Mehtab404/DeepLearningProject}.
 
 \section{Background}
 
@@ -204,6 +211,35 @@ $224 \times 224$ with bilinear interpolation. About 5.7M parameters.
 models after adversarial fine-tuning (next section).
 \end{itemize}
 
+\textbf{Pretrained models used.} To stay within the time limit of a free
+GPU, both architectures start from publicly available pretrained weights
+instead of being trained from random initialisation
+(Table~\ref{tab:pretrained}). The ResNet-20 weights are already trained on
+CIFAR-10, so no clean training was needed. The ViT-Tiny weights come from
+ImageNet, so we replaced its classifier with a 10-class head and
+fine-tuned it on CIFAR-10. Both architectures were then trained by us
+during the 10-epoch adversarial fine-tuning, and each AdvTrained model
+starts from exactly the same weights as its clean version. This gives a
+direct measurement of the cost of adversarial training on clean accuracy.
+
+\begin{table}[htbp]
+\centerline{
+\small
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+Model & Architecture & Pretrained weights (source) & Pretrained on & Our training \\ \hline \hline
+CNN-Clean & ResNet-20, 0.27M & \texttt{cifar10\_resnet20}, & CIFAR-10 & none \\
+          &                  & \texttt{chenyaofo/pytorch-cifar-models} \cite{Chenyaofo} & & \\ \hline
+ViT-Clean & ViT-Tiny/16, 5.7M & \texttt{vit\_tiny\_patch16\_224}, & ImageNet & 5 epochs clean \\
+          &                   & \texttt{timm} \cite{Wightman:19} & & fine-tuning \\ \hline
+CNN-AdvTrained & ResNet-20 & starts from CNN-Clean & -- & 10 epochs PGD-5 \\ \hline
+ViT-AdvTrained & ViT-Tiny/16 & starts from ViT-Clean & -- & 10 epochs PGD-5 \\ \hline
+\end{tabular}
+}
+\caption{Pretrained models and the training we performed on each.}
+\label{tab:pretrained}
+\end{table}
+
 \subsection{Adversarial fine-tuning}
 
 Both clean models are fine-tuned for 10 epochs with $\epsilon = 8/255$
@@ -241,7 +277,7 @@ on a single NVIDIA T4 GPU in Google Colab, using PyTorch
 \cite{Paszke:19}, torchvision and \texttt{timm}. The random seed is 42.
 The results are from one training run per model.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centerline{
 \begin{tabular}{|l|l|}
 \hline
@@ -276,7 +312,7 @@ adversarially fine-tuned models. Blue: CNN. Red: ViT.}
 \label{fig:acc}
 \end{figure}
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centerline{
 \begin{tabular}{|l|c|c|c|}
 \hline
@@ -291,7 +327,7 @@ ViT-AdvTrained (PGD-5)   & 94.1 & 72.7 & 42.2 \\ \hline
 \label{tab:main}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centerline{
 \small
 \begin{tabular}{|l|l|c|c|c|c|c|c|}
@@ -348,7 +384,7 @@ Our first ViT run used RS-FGSM instead of PGD-5 for adversarial training,
 because it is about 2.5 times faster (30.1 min instead of 74.7 min on the
 T4). Table~\ref{tab:rs} compares the two ViT models.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centerline{
 \begin{tabular}{|l|l|c|c|c|c|c|}
 \hline
@@ -389,7 +425,7 @@ The diagonal is the white-box case.}
 \label{fig:transfer}
 \end{figure}
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centerline{
 \begin{tabular}{|l|c|c|c|c|}
 \hline
@@ -498,58 +534,58 @@ models of similar size and pretraining.
 
 \bibitem{Szegedy:14}
 C. Szegedy, W. Zaremba, I. Sutskever, J. Bruna, D. Erhan, I. Goodfellow,
-R. Fergus, "Intriguing properties of neural networks",
+R. Fergus, ``Intriguing properties of neural networks'',
 {\em Intl. Conf. on Learning Representations (ICLR)}, 2014.
 
 \bibitem{Goodfellow:15}
-I. J. Goodfellow, J. Shlens, C. Szegedy, "Explaining and Harnessing
-Adversarial Examples", {\em Intl. Conf. on Learning Representations
-(ICLR)}, 2015. https://arxiv.org/abs/1412.6572
+I. J. Goodfellow, J. Shlens, C. Szegedy, ``Explaining and Harnessing
+Adversarial Examples'', {\em Intl. Conf. on Learning Representations
+(ICLR)}, 2015. \url{https://arxiv.org/abs/1412.6572}
 
 \bibitem{Madry:18}
-A. Madry, A. Makelov, L. Schmidt, D. Tsipras, A. Vladu, "Towards Deep
-Learning Models Resistant to Adversarial Attacks", {\em Intl. Conf. on
-Learning Representations (ICLR)}, 2018. https://arxiv.org/abs/1706.06083
+A. Madry, A. Makelov, L. Schmidt, D. Tsipras, A. Vladu, ``Towards Deep
+Learning Models Resistant to Adversarial Attacks'', {\em Intl. Conf. on
+Learning Representations (ICLR)}, 2018. \url{https://arxiv.org/abs/1706.06083}
 
 \bibitem{Wong:20}
-E. Wong, L. Rice, J. Z. Kolter, "Fast is better than free: Revisiting
-adversarial training", {\em Intl. Conf. on Learning Representations
-(ICLR)}, 2020. https://arxiv.org/abs/2001.03994
+E. Wong, L. Rice, J. Z. Kolter, ``Fast is better than free: Revisiting
+adversarial training'', {\em Intl. Conf. on Learning Representations
+(ICLR)}, 2020. \url{https://arxiv.org/abs/2001.03994}
 
 \bibitem{He:16}
-K. He, X. Zhang, S. Ren, J. Sun, "Deep Residual Learning for Image
-Recognition", {\em IEEE Conf. on Computer Vision and Pattern Recognition
+K. He, X. Zhang, S. Ren, J. Sun, ``Deep Residual Learning for Image
+Recognition'', {\em IEEE Conf. on Computer Vision and Pattern Recognition
 (CVPR)}, 2016.
 
 \bibitem{Dosovitskiy:21}
-A. Dosovitskiy et al., "An Image is Worth 16x16 Words: Transformers for
-Image Recognition at Scale", {\em Intl. Conf. on Learning Representations
+A. Dosovitskiy et al., ``An Image is Worth 16x16 Words: Transformers for
+Image Recognition at Scale'', {\em Intl. Conf. on Learning Representations
 (ICLR)}, 2021.
 
 \bibitem{Krizhevsky:09}
-A. Krizhevsky, "Learning Multiple Layers of Features from Tiny Images",
+A. Krizhevsky, ``Learning Multiple Layers of Features from Tiny Images'',
 Technical Report, University of Toronto, 2009.
 
 \bibitem{Chenyaofo}
-Y. Chen, "PyTorch CIFAR models: pretrained ResNet, MobileNet and other
-models for CIFAR-10/100", GitHub repository
+Y. Chen, ``PyTorch CIFAR models: pretrained ResNet, MobileNet and other
+models for CIFAR-10/100'', GitHub repository
 \texttt{chenyaofo/pytorch-cifar-models}.
 
 \bibitem{Wightman:19}
-R. Wightman, "PyTorch Image Models (timm)", GitHub repository
+R. Wightman, ``PyTorch Image Models (timm)'', GitHub repository
 \texttt{huggingface/pytorch-image-models}, 2019.
 
 \bibitem{Loshchilov:19}
-I. Loshchilov, F. Hutter, "Decoupled Weight Decay Regularization",
+I. Loshchilov, F. Hutter, ``Decoupled Weight Decay Regularization'',
 {\em Intl. Conf. on Learning Representations (ICLR)}, 2019.
 
 \bibitem{Micikevicius:18}
-P. Micikevicius et al., "Mixed Precision Training", {\em Intl. Conf. on
+P. Micikevicius et al., ``Mixed Precision Training'', {\em Intl. Conf. on
 Learning Representations (ICLR)}, 2018.
 
 \bibitem{Paszke:19}
-A. Paszke et al., "PyTorch: An Imperative Style, High-Performance Deep
-Learning Library", {\em Advances in Neural Information Processing Systems
+A. Paszke et al., ``PyTorch: An Imperative Style, High-Performance Deep
+Learning Library'', {\em Advances in Neural Information Processing Systems
 (NeurIPS)}, 2019.
 
 \end{thebibliography}

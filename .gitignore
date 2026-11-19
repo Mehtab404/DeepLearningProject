@@ -19,3 +19,10 @@ data/
 # outputs/ (png, csv, md) and TASK.md are intentionally tracked.
 
 checkpoints_quick_test/
+
+# Redundant / generated artifacts (not needed to run or grade the project)
+*.zip
+*.tar.gz
+.kiro/
+.DS_Store
+Thumbs.db

@@ -148,6 +148,7 @@ def main():
         adv_models[label] = model.eval()
 
     models = {"CNN-Clean": cnn_clean, "ViT-Clean": vit_clean, **adv_models}
+    # Freeze weights: attacks only need gradients w.r.t. the input, which saves memory and time.
     for m in models.values():
         for prm in m.parameters():
             prm.requires_grad_(False)   # attacks need input grads only

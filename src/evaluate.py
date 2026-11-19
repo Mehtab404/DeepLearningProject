@@ -45,6 +45,7 @@ def evaluate_epsilon_sweep(models, X, Y, device, eps_list=EPS_LIST, pgd_steps=10
         for attack in ("FGSM", "PGD-10"):
             for e in eps_list:
                 torch.manual_seed(seed)                      # reproducible random starts
+                # White-box: the attack uses the SAME model it then evaluates.
                 eps = e / 255.0
                 fn = _attack_fn(attack, eps, pgd_steps)
                 correct = 0
@@ -73,6 +74,7 @@ def evaluate_transferability(models, X, Y, device, eps=8 / 255, pgd_steps=10, ba
             x, y = X[i:i + batch_size].to(device), Y[i:i + batch_size].to(device)
             adv_batches.append(pgd_attack(models[src], x, y, eps, alpha=max(eps / 4, 1 / 255),
                                           steps=pgd_steps, random_start=True).cpu())
+        # Craft once on the source model, then test those same images on every target model.
         X_adv = torch.cat(adv_batches)
         for tgt in names:
             mat.loc[src, tgt] = accuracy(models[tgt], X_adv, Y, device, batch_size)

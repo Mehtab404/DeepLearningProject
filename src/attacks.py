@@ -18,12 +18,16 @@ import torch.nn.functional as F
 
 def _input_grad(model, x, y, amp=False):
     """Gradient of the summed cross-entropy loss w.r.t. the input x."""
+    # Fresh leaf tensor so we get d(loss)/d(input) and not d(loss)/d(weights)
     x = x.clone().detach().requires_grad_(True)
     use_amp = bool(amp) and x.is_cuda
     with torch.autocast(device_type="cuda" if x.is_cuda else "cpu", enabled=use_amp):
         logits = model(x)
+    # Cast logits to fp32 before the loss so fp16 gradients cannot underflow to 0.
+    # "sum" (not "mean") keeps each image's gradient independent of the batch size.
     loss = F.cross_entropy(logits.float(), y, reduction="sum")
     grad = torch.autograd.grad(loss, x)[0]
+    # nan_to_num: a NaN gradient would make sign() NaN and silently corrupt the image.
     return torch.nan_to_num(grad.detach())
 
 
@@ -32,6 +36,7 @@ def fgsm_attack(model, x, y, eps, amp=False):
     if eps == 0:
         return x.clone().detach()
     grad = _input_grad(model, x, y, amp)
+    # One step of size eps in the direction that INCREASES the loss (sign = L-inf steepest ascent).
     x_adv = x.detach() + eps * grad.sign()
     return torch.clamp(x_adv, 0.0, 1.0).detach()
 
@@ -52,6 +57,7 @@ def pgd_attack(model, x, y, eps, alpha=None, steps=10, random_start=True, amp=Fa
         x_adv = torch.clamp(x + torch.empty_like(x).uniform_(-eps, eps), 0.0, 1.0)
     else:
         x_adv = x.clone()
+    # Iterate: small gradient-sign step, then project back into the allowed set (the two clamps below).
     for _ in range(steps):
         grad = _input_grad(model, x_adv, y, amp)
         x_adv = x_adv + alpha * grad.sign()
@@ -70,6 +76,8 @@ def rs_fgsm_attack(model, x, y, eps, alpha=None, amp=False):
     if alpha is None:
         alpha = 1.25 * eps
     x = x.detach()
+    # Random start avoids the "catastrophic overfitting" of plain FGSM training: the model cannot
+    # just learn to mask the gradient at exactly x.
     x0 = torch.clamp(x + torch.empty_like(x).uniform_(-eps, eps), 0.0, 1.0)
     grad = _input_grad(model, x0, y, amp)
     delta = torch.clamp(x0 + alpha * grad.sign() - x, -eps, eps)

@@ -36,6 +36,9 @@ def _with_retries(fn, what="download", attempts=5, base_delay=5):
 
 
 class NormalizedModelWrapper(nn.Module):
+    """Wraps a network so it accepts raw [0,1] images: resize (ViT only) -> normalise -> network -> logits.
+
+    This is why epsilon is measured in true pixel units for both CNN and ViT."""
     def __init__(self, model, mean=CIFAR_MEAN, std=CIFAR_STD, img_size=None):
         super().__init__()
         self.model = model
@@ -46,8 +49,10 @@ class NormalizedModelWrapper(nn.Module):
     def forward(self, x):
         if self.img_size is not None and x.shape[-1] != self.img_size:
             x = F.interpolate(x, size=(self.img_size, self.img_size), mode='bilinear', align_corners=False)
+        # Normalisation is part of the model, so attacks never see normalised tensors.
         x_norm = (x - self.mean) / self.std
         out = self.model(x_norm)
+        # HuggingFace models return an object with .logits; torchvision/timm return a tensor.
         return out.logits if hasattr(out, 'logits') else out
 
 

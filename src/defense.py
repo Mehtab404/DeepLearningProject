@@ -89,6 +89,7 @@ def adversarial_finetune(model, train_loader, epochs=10, eps=8 / 255, method="pg
                 break
             x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
 
+            # eval() while attacking so dropout/BatchNorm statistics are not disturbed by crafting x_adv.
             model.eval()
             with _autocast(device, use_amp):
                 x_adv = attack(model, x, y)
@@ -99,6 +100,8 @@ def adversarial_finetune(model, train_loader, epochs=10, eps=8 / 255, method="pg
                 logits = model(torch.cat([x, x_adv], dim=0))
             logits = logits.float()
             bs = x.size(0)
+            # Mixed adversarial training: half the loss on clean images (keeps clean accuracy),
+            # half on adversarial images (buys robustness). This is the clean/robust trade-off knob.
             loss = 0.5 * F.cross_entropy(logits[:bs], y) + 0.5 * F.cross_entropy(logits[bs:], y)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
