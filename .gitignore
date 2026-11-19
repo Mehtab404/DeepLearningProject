@@ -26,3 +26,6 @@ checkpoints_quick_test/
 .kiro/
 .DS_Store
 Thumbs.db
+
+# Report (not published for now)
+report/
