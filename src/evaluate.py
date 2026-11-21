@@ -14,6 +14,19 @@ import torch
 
 from .attacks import fgsm_attack, pgd_attack
 
+# ===================================================================================================
+# EASY-LANGUAGE SUMMARY OF THIS FILE (read this first)
+# ---------------------------------------------------------------------------------------------------
+# What is this file?   It is the EXAMINER. It measures how good each model is, with and without attack.
+# We compare 4 models: CNN-Clean, ViT-Clean (normal) and CNN-AdvTrained, ViT-AdvTrained (defended).
+# Experiment 1 (epsilon sweep): attack with eps = 0,1,2,4,8,16 (/255). Bigger eps = stronger attack.
+#     eps = 0 means no attack, so that number is the normal accuracy.
+# Experiment 2 (transferability): make fooled pictures using model A, then test them on model B.
+#     If B is fooled too, the attack "transfers". Result is a 4x4 table.
+# "Accuracy" = (number of correct predictions / total pictures) * 100.
+# "White-box" = attacker knows the model (can use its gradients). Here we attack the same model we test.
+# ===================================================================================================
+
 EPS_LIST = [0, 1, 2, 4, 8, 16]            # in units of 1/255
 MODEL_ORDER = ["CNN-Clean", "ViT-Clean", "CNN-AdvTrained", "ViT-AdvTrained"]
 
@@ -23,6 +36,8 @@ MODEL_ORDER = ["CNN-Clean", "ViT-Clean", "CNN-AdvTrained", "ViT-AdvTrained"]
 def _correct(model, x, y):
     # Number of images in the batch where the predicted class (highest score) equals the true label.
     return (model(x).argmax(1) == y).sum().item()
+    # EASY: model(x) gives 10 scores per image; argmax picks the biggest = the model's guess.
+    #       "== y" checks if the guess is right; sum() counts the right ones.
 
 
 def accuracy(model, X, Y, device, batch_size=100):

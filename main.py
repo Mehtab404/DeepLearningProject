@@ -27,6 +27,25 @@ from src.utils import (SEED, get_device, git_auto_push, load_json, restore_from_
                        sync_to_drive)
 from src.visualize import make_all_plots
 
+# ===================================================================================================
+# EASY-LANGUAGE SUMMARY OF THE WHOLE PROJECT (read this first)
+# ---------------------------------------------------------------------------------------------------
+# QUESTION THE PROJECT ANSWERS:  Which is harder to fool with tiny invisible noise: a CNN or a
+#                                Vision Transformer (ViT)?  And does special training help?
+# STEPS (this file runs them in order):
+#   1. Load two normal models: CNN (ResNet-20) and ViT (ViT-Tiny).
+#   2. Make a "defended" copy of each by adversarial training (training on fooled pictures too).
+#      Now we have 4 models: CNN-Clean, ViT-Clean, CNN-AdvTrained, ViT-AdvTrained.
+#   3. Attack all 4 with FGSM and PGD at different strengths (eps) and record the accuracy.
+#      Also test whether fooled pictures from one model fool another model (transferability).
+#   4. Save tables (CSV / Markdown) and graphs (PNG) in the outputs/ folder.
+# WHICH FILE DOES WHAT:
+#   src/data.py      -> pictures        src/models.py   -> CNN and ViT
+#   src/attacks.py   -> FGSM, PGD       src/defense.py  -> adversarial training
+#   src/evaluate.py  -> accuracy tests  src/visualize.py-> graphs     src/utils.py -> helpers
+# HOW TO RUN:  python main.py --quick-test   (tiny test on CPU)   |   python main.py --full-run (GPU)
+# ===================================================================================================
+
 
 def parse_args():
     # Reads the command-line options, e.g. "python main.py --epochs 5 --eps 4".

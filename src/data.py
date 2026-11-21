@@ -14,6 +14,20 @@ from torchvision import datasets, transforms
 
 from .utils import SEED
 
+# ===================================================================================================
+# EASY-LANGUAGE SUMMARY OF THIS FILE (read this first)
+# ---------------------------------------------------------------------------------------------------
+# What is this file?   It gets the pictures (CIFAR-10 dataset) ready for the models.
+# CIFAR-10 = 60,000 tiny colour pictures (32x32) of 10 things: plane, car, bird, cat, deer, dog,
+#            frog, horse, ship, truck.  50,000 are for TRAINING, 10,000 are for TESTING.
+# Functions:
+#   prepare_data()        - download the dataset if it is not already on the computer.
+#   get_train_loader()    - hands out training pictures in small shuffled groups (batches).
+#   stratified_indices()  - picks the SAME number of test pictures from each class (fair test).
+#   get_eval_tensors()    - builds the final fixed test set used to compare all models.
+# Pixel values stay between 0 and 1 (we do not normalise here) so that "eps" means the same for all models.
+# ===================================================================================================
+
 CIFAR_TAR = "cifar-10-python.tar.gz"    # name of the downloaded archive file
 
 

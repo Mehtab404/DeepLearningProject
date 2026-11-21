@@ -16,6 +16,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# ===================================================================================================
+# EASY-LANGUAGE SUMMARY OF THIS FILE (read this first)
+# ---------------------------------------------------------------------------------------------------
+# What is this file?   It creates / loads / saves the two models we compare.
+#   CNN = ResNet-20.  Looks at the picture through small sliding windows (filters), step by step.
+#   ViT = Vision Transformer (ViT-Tiny). Cuts the picture into square patches (like puzzle pieces)
+#         and lets every patch "talk to" every other patch (this is called self-attention).
+# Both come PRE-TRAINED (already learned), so we do not train from zero.
+# Key trick: NormalizedModelWrapper. The model itself does the resizing + normalising, so outside the
+#            model every picture is a plain 0-to-1 picture. That keeps "eps" fair for both models.
+# Functions here: load_cnn_clean, load_vit_clean, save_checkpoint, load_checkpoint, sanity_check.
+# "checkpoint" = a saved file of the model's learned weights (.pth).
+# ===================================================================================================
+
 # Per-channel (R, G, B) mean and standard deviation of the CIFAR-10 training images.
 # The pretrained ResNet was trained on images normalised with these numbers.
 CIFAR_MEAN = (0.4914, 0.4822, 0.4465)
@@ -70,6 +84,7 @@ class NormalizedModelWrapper(nn.Module):
             x = F.interpolate(x, size=(self.img_size, self.img_size), mode='bilinear', align_corners=False)
         # Normalisation is part of the model, so attacks never see normalised tensors.
         x_norm = (x - self.mean) / self.std
+        # EASY: normalising = subtract the average colour, divide by the spread. Models learn better this way.
         out = self.model(x_norm)
         # HuggingFace models return an object with .logits; torchvision/timm return a tensor.
         return out.logits if hasattr(out, 'logits') else out

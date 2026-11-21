@@ -16,6 +16,17 @@ import torch
 from .attacks import pgd_attack
 from .models import CIFAR10_CLASSES
 
+# ===================================================================================================
+# EASY-LANGUAGE SUMMARY OF THIS FILE (read this first)
+# ---------------------------------------------------------------------------------------------------
+# What is this file?   It draws the graphs / pictures for the report (saved as PNG in outputs/).
+#   Graph 1: accuracy vs eps  - lines going DOWN as the attack gets stronger.
+#   Graph 2: trade-off bars   - accuracy before vs after adversarial training.
+#   Graph 3: heatmap          - which model's fooled pictures also fool the other models.
+#   Graph 4: example images   - original picture, the (magnified) noise, and the fooled picture.
+# Nothing here changes the models. It only shows the results.
+# ===================================================================================================
+
 DPI = 300    # resolution of saved images (300 = print quality)
 COLORS = {"CNN": "#1f77b4", "ViT": "#d62728"}    # blue for CNN, red for ViT
 

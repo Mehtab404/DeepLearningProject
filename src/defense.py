@@ -23,6 +23,27 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm    # progress bar
 
+# ===================================================================================================
+# EASY-LANGUAGE SUMMARY OF THIS FILE (read this first)
+# ---------------------------------------------------------------------------------------------------
+# What is this file?   It is the DEFENCE. It makes a model harder to fool.
+# How?                 "Adversarial training": while training, we ALSO show the model fooled pictures
+#                      (made by the attacks in attacks.py) together with the correct label.
+#                      Like a student who practises with the hardest, trickiest questions.
+# Each batch of training does these steps:
+#   1. Take a batch of normal pictures.
+#   2. Make an attacked copy of each picture (PGD-5 or RS-FGSM).
+#   3. Give BOTH (normal + attacked) to the model, and compute the loss on both.
+#   4. Update the model's weights so it gets both right next time.
+# Price of safety: the model usually becomes a bit LESS accurate on normal pictures.
+#                  This is the "clean vs robust trade-off".
+# Other things in this file:
+#   - Checkpoint after every epoch, so if Colab crashes we can continue instead of starting again.
+#   - clean_finetune(): normal training with no attack (used only to prepare the ViT).
+# Words: epoch = one full pass through all training images; batch = a small group of images;
+#        loss = how wrong the model is; optimizer = the thing that updates the weights.
+# ===================================================================================================
+
 from .attacks import pgd_attack, rs_fgsm_attack
 from .models import save_checkpoint
 from .utils import git_auto_push, load_json, save_json, sync_to_drive
@@ -138,13 +159,18 @@ def adversarial_finetune(model, train_loader, epochs=10, eps=8 / 255, method="pg
             # Mixed adversarial training: half the loss on clean images (keeps clean accuracy),
             # half on adversarial images (buys robustness). This is the clean/robust trade-off knob.
             loss = 0.5 * F.cross_entropy(logits[:bs], y) + 0.5 * F.cross_entropy(logits[bs:], y)
+            # EASY: loss = half "mistake on normal pictures" + half "mistake on attacked pictures".
+            #       Lower loss = model is right more often on both kinds.
 
             # Backpropagation with the GradScaler (see above), then one optimizer step.
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
 
+            # EASY: backward() = work out how each weight should change; step() = actually change the weights.
+
             # Statistics for the progress bar. argmax(1) = index of the highest score = predicted class.
+            # EASY: "correct" = the class with the highest score equals the true label.
             tot_loss += loss.item() * bs
             tot_clean += (logits[:bs].argmax(1) == y).sum().item()
             tot_adv += (logits[bs:].argmax(1) == y).sum().item()

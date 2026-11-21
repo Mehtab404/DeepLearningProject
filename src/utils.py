@@ -9,6 +9,17 @@ import sys
 import numpy as np
 import torch
 
+# ===================================================================================================
+# EASY-LANGUAGE SUMMARY OF THIS FILE (read this first)
+# ---------------------------------------------------------------------------------------------------
+# What is this file?   Small helper tools used by the other files (no deep learning here).
+#   set_seed()          - makes random numbers repeatable, so every run gives the same result.
+#   get_device()        - chooses GPU (fast) if available, otherwise CPU (slow).
+#   save_json/load_json - save / read results in a simple text file format (JSON).
+#   git_auto_push()     - automatically uploads the work to GitHub (optional, for Colab).
+#   sync_to_drive / restore_from_drive - back up files to Google Drive and bring them back.
+# ===================================================================================================
+
 # One fixed random seed for the whole project, so results can be reproduced.
 SEED = 42
 

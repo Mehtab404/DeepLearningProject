@@ -20,11 +20,38 @@ Conventions
 # Normal training changes the WEIGHTS to DECREASE the loss.
 # An attack keeps the weights fixed and changes the INPUT IMAGE to INCREASE the loss.
 # ---------------------------------------------------------------------------------------------------
+# ===================================================================================================
+# EASY-LANGUAGE SUMMARY OF THIS FILE (read this first)
+# ---------------------------------------------------------------------------------------------------
+# What is this file?   It contains the "attacks" - tricks to fool a trained image model.
+# What is an attack?   We take a normal picture (say a cat) and change its pixels by a TINY amount.
+#                      A human still sees a cat, but the model now says "dog". That changed picture
+#                      is called an "adversarial example".
+# How do we know which way to change the pixels?
+#                      We ask the model "if I make this pixel brighter, does your mistake get bigger
+#                      or smaller?". That answer is the GRADIENT. We then push every pixel in the
+#                      direction that makes the model's mistake BIGGER.
+# Words used below:
+#   x      = the original image (numbers between 0 and 1)
+#   y      = the true label of the image (0 to 9)
+#   eps    = the maximum amount any one pixel is allowed to change (e.g. 8/255 = very small)
+#   loss   = a number that tells HOW WRONG the model is (big loss = very wrong)
+#   grad   = gradient = direction in which the loss grows
+#   sign() = turns a number into -1, 0 or +1 (we only care about the direction, not the size)
+#   clamp  = cut a value so it stays inside a range, e.g. clamp(a, 0, 1) keeps a between 0 and 1
+#
+# The 3 attacks in this file:
+#   1. FGSM    - ONE big step.                       Fast, weaker.
+#   2. PGD     - MANY small steps (here 10).         Slower, much stronger. Used to TEST the models.
+#   3. RS-FGSM - random start + ONE step.            Fast, used to TRAIN the defence.
+# ===================================================================================================
 import torch
 import torch.nn.functional as F
 
 
 def _input_grad(model, x, y, amp=False):
+    # EASY: This helper finds, for every pixel, which direction (up or down) makes the model MORE wrong.
+    #       All three attacks below call this helper. "_" at the start of the name means "internal use".
     """Gradient of the summed cross-entropy loss w.r.t. the input x."""
     # This helper answers: "in which direction should each pixel move to make the loss bigger?"
     # It is shared by all three attacks below.
@@ -42,6 +69,7 @@ def _input_grad(model, x, y, amp=False):
     # Cast logits to fp32 before the loss so fp16 gradients cannot underflow to 0.
     # "sum" (not "mean") keeps each image's gradient independent of the batch size.
     loss = F.cross_entropy(logits.float(), y, reduction="sum")
+    # EASY: cross_entropy = "how wrong is the model?". Small if it guessed the right class, big if not.
 
     # torch.autograd.grad returns d(loss)/d(x) directly. Unlike loss.backward(), it does NOT store
     # gradients in the model's parameters (.grad), so the attack never interferes with training.
@@ -54,6 +82,8 @@ def _input_grad(model, x, y, amp=False):
 def fgsm_attack(model, x, y, eps, amp=False):
     """x_adv = clip_[0,1]( x + eps * sign( grad_x L(theta, x, y) ) )   [Goodfellow et al., 2015]"""
     # FGSM = Fast Gradient Sign Method. A single, cheap, one-step attack.
+    # EASY: Look at the gradient once, then move EVERY pixel by exactly +eps or -eps (towards "more wrong").
+    #       Formula in words: new image = old image + eps * (direction of the gradient)
 
     # eps = 0 means "no attack": return an unchanged copy (this gives the clean accuracy).
     if eps == 0:
@@ -64,6 +94,7 @@ def fgsm_attack(model, x, y, eps, amp=False):
     # sign() turns every gradient value into -1, 0 or +1, so every pixel moves by exactly eps.
     # That is the biggest change allowed under the L-infinity limit.
     x_adv = x.detach() + eps * grad.sign()
+    # EASY: every pixel moves by +eps or -eps, whichever makes the model more wrong.
 
     # Pixel values must stay valid (between 0 and 1), so clip them.
     return torch.clamp(x_adv, 0.0, 1.0).detach()
@@ -79,6 +110,10 @@ def pgd_attack(model, x, y, eps, alpha=None, steps=10, random_start=True, amp=Fa
     # PGD = Projected Gradient Descent. It is "FGSM repeated many times with small steps".
     # It is much stronger than FGSM because it can follow the loss surface around curves,
     # so it is the standard attack for measuring real robustness.
+    # EASY: Instead of one big jump (FGSM), take 10 small careful steps. After each step, check the
+    #       gradient again. If we ever drift too far from the original picture (more than eps),
+    #       we pull the picture back. That "pulling back" is called PROJECTION.
+    #       Result: a stronger attack, because it finds a better mistake-causing noise.
 
     if eps == 0:
         return x.clone().detach()
@@ -97,11 +132,14 @@ def pgd_attack(model, x, y, eps, alpha=None, steps=10, random_start=True, amp=Fa
 
     # Iterate: small gradient-sign step, then project back into the allowed set (the two clamps below).
     for _ in range(steps):
+        # EASY: each round = (1) find direction, (2) take a small step, (3) make sure we did not go too far.
         grad = _input_grad(model, x_adv, y, amp)    # gradient at the CURRENT adversarial image
         x_adv = x_adv + alpha * grad.sign()         # take a small step uphill on the loss
         # "Projection" = pull the image back if it went outside the allowed region.
         delta = torch.clamp(x_adv - x, -eps, eps)      # project onto the L-inf ball
+        # EASY: delta = how much the picture changed so far. Clamp keeps every change inside [-eps, +eps].
         x_adv = torch.clamp(x + delta, 0.0, 1.0)       # project onto the valid image box
+        # EASY: add the (limited) change to the original image, then keep pixels between 0 and 1.
     return x_adv.detach()
 
 
@@ -112,6 +150,9 @@ def rs_fgsm_attack(model, x, y, eps, alpha=None, amp=False):
     """
     # RS-FGSM is used for TRAINING only (not for evaluation). It costs one gradient like FGSM,
     # but the random start makes the training much more effective. It is about 2.5x cheaper than PGD-5.
+    # EASY: Step 1 - add small random noise to the picture (random start).
+    #       Step 2 - take ONE gradient step from there.
+    #       It is "FGSM with a random starting point", so it is as fast as FGSM but works better for training.
 
     if eps == 0:
         return x.clone().detach()
@@ -132,6 +173,8 @@ def rs_fgsm_attack(model, x, y, eps, alpha=None, amp=False):
 def check_perturbation(x, x_adv, eps, tol=1e-6):
     """Assert the L-inf budget and the [0, 1] pixel range (task 3.4)."""
     # Safety check used in tests: proves an attack did not "cheat" by changing pixels too much.
+    # EASY: Two rules are checked: (1) no pixel changed by more than eps, (2) all pixels are still
+    #       between 0 and 1. If a rule is broken, "assert" stops the program with an error message.
     linf = torch.max(torch.abs(x_adv - x)).item()    # the largest change of any single pixel
     # tol allows tiny floating-point rounding errors.
     assert linf <= eps + tol, f"L-inf violated: {linf:.8f} > eps {eps:.8f}"
