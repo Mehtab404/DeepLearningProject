@@ -1,173 +1,100 @@
-"""Model definitions: normalization wrapper + pretrained CIFAR-10 CNN and ViT loaders.
+"""Models: the two image-recognising models we compare (a CNN and a ViT)."""
+import os  # work with file and folder paths
+import time  # used to wait between retries
 
-Golden rule: every tensor that reaches an attack lives in [0, 1]. The (x - mean) / std step
-(and bilinear upsampling for the ViT) happens INSIDE forward(), so epsilon and clamp(0, 1)
-are exact in pixel space for every architecture.
-"""
-# Two model families are compared:
-#   CNN (Convolutional Neural Network): ResNet-20. It looks at small local patches with sliding filters.
-#   ViT (Vision Transformer): splits the image into 16x16 patches and uses self-attention, so every
-#       patch can look at every other patch (global view).
-# Both are PRETRAINED (someone already trained them), so we only need to fine-tune them.
-import os
-import time
+import torch  # main library for deep learning
+import torch.nn as nn  # building blocks for models
+import torch.nn.functional as F  # ready-made maths functions (we use it to resize images)
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+CIFAR_MEAN = (0.4914, 0.4822, 0.4465)  # average red, green, blue value of the training images
+CIFAR_STD = (0.2470, 0.2435, 0.2616)  # how much red, green, blue values usually vary from that average
 
-# ===================================================================================================
-# EASY-LANGUAGE SUMMARY OF THIS FILE (read this first)
-# ---------------------------------------------------------------------------------------------------
-# What is this file?   It creates / loads / saves the two models we compare.
-#   CNN = ResNet-20.  Looks at the picture through small sliding windows (filters), step by step.
-#   ViT = Vision Transformer (ViT-Tiny). Cuts the picture into square patches (like puzzle pieces)
-#         and lets every patch "talk to" every other patch (this is called self-attention).
-# Both come PRE-TRAINED (already learned), so we do not train from zero.
-# Key trick: NormalizedModelWrapper. The model itself does the resizing + normalising, so outside the
-#            model every picture is a plain 0-to-1 picture. That keeps "eps" fair for both models.
-# Functions here: load_cnn_clean, load_vit_clean, save_checkpoint, load_checkpoint, sanity_check.
-# "checkpoint" = a saved file of the model's learned weights (.pth).
-# ===================================================================================================
+CIFAR10_CLASSES = ["airplane", "automobile", "bird", "cat", "deer",  # the 10 picture types; label 0 = airplane, 1 = automobile, ...
+                   "dog", "frog", "horse", "ship", "truck"]  # ... label 9 = truck
 
-# Per-channel (R, G, B) mean and standard deviation of the CIFAR-10 training images.
-# The pretrained ResNet was trained on images normalised with these numbers.
-CIFAR_MEAN = (0.4914, 0.4822, 0.4465)
-CIFAR_STD = (0.2470, 0.2435, 0.2616)
-
-# Label i means CIFAR10_CLASSES[i], e.g. label 3 = "cat".
-CIFAR10_CLASSES = ["airplane", "automobile", "bird", "cat", "deer",
-                   "dog", "frog", "horse", "ship", "truck"]
-
-# Where the pretrained weights come from:
-HF_VIT_ID = "aaraki/vit-base-patch16-224-in21k-finetuned-cifar10"    # HuggingFace ViT-Base (optional)
-HUB_REPO = "chenyaofo/pytorch-cifar-models:master"                    # GitHub repo with CIFAR ResNets
+HF_VIT_ID = "aaraki/vit-base-patch16-224-in21k-finetuned-cifar10"  # name of an optional bigger ViT on the HuggingFace website
+HUB_REPO = "chenyaofo/pytorch-cifar-models:master"  # GitHub place where the ready-made CNN is downloaded from
 
 
-def _with_retries(fn, what="download", attempts=5, base_delay=5):
-    """Run fn(); retry transient network failures (HTTP 5xx, timeouts) with a growing delay."""
-    # Downloads sometimes fail for a moment. Instead of crashing, try again up to `attempts` times,
-    # waiting 5s, 10s, 15s, ... between tries.
-    for i in range(1, attempts + 1):
-        try:
-            return fn()
-        except Exception as e:  # noqa: BLE001 - urllib/requests/hub raise many different error types
-            if i == attempts:
-                raise
-            wait = base_delay * i
-            print(f"[retry] {what} failed ({type(e).__name__}: {str(e)[:120]}); attempt {i}/{attempts}, "
-                  f"retrying in {wait}s")
-            time.sleep(wait)
+def _with_retries(fn, what="download", attempts=5, base_delay=5):  # runs fn(); if the internet fails, waits and tries again
+    for i in range(1, attempts + 1):  # try up to 5 times
+        try:  # attempt the job
+            return fn()  # success: give back the result and stop
+        except Exception as e:  # noqa: BLE001 - something went wrong (e.g. network problem)
+            if i == attempts:  # this was the last try
+                raise  # give up and show the error
+            wait = base_delay * i  # wait longer after each failure: 5s, 10s, 15s ...
+            print(f"[retry] {what} failed ({type(e).__name__}: {str(e)[:120]}); attempt {i}/{attempts}, "  # tell the user what failed
+                  f"retrying in {wait}s")  # and how long we wait
+            time.sleep(wait)  # pause before trying again
 
 
-class NormalizedModelWrapper(nn.Module):
-    """Wraps a network so it accepts raw [0,1] images: resize (ViT only) -> normalise -> network -> logits.
+class NormalizedModelWrapper(nn.Module):  # a cover around a model: it resizes and rescales the image first, so outside the model images stay plain 0-to-1
+    def __init__(self, model, mean=CIFAR_MEAN, std=CIFAR_STD, img_size=None):  # set up the cover
+        super().__init__()  # start the basic PyTorch model setup
+        self.model = model  # the real model inside (CNN or ViT)
+        self.img_size = img_size  # size to enlarge images to (None = keep the size; 224 for the ViT)
+        self.register_buffer('mean', torch.tensor(mean).view(1, 3, 1, 1))  # store the average colour inside the model (fixed numbers, not learned)
+        self.register_buffer('std', torch.tensor(std).view(1, 3, 1, 1))  # store the colour variation inside the model (fixed numbers, not learned)
 
-    This is why epsilon is measured in true pixel units for both CNN and ViT."""
-    # Why a wrapper? The attacks add noise to the RAW image and clip it to [0, 1]. If normalisation were
-    # done in the data loader, eps would mean something different for each model. Putting resize +
-    # normalisation inside the model keeps the attack code identical and fair for CNN and ViT.
-    def __init__(self, model, mean=CIFAR_MEAN, std=CIFAR_STD, img_size=None):
-        super().__init__()
-        self.model = model            # the real network (ResNet or ViT)
-        self.img_size = img_size      # None for the CNN (keeps 32x32), 224 for the ViT
-        # register_buffer: stores mean/std inside the model (moved to GPU with .to(device), saved in the
-        # checkpoint) but they are NOT trainable parameters.
-        # view(1, 3, 1, 1) reshapes them so they broadcast over (batch, channels, height, width).
-        self.register_buffer('mean', torch.tensor(mean).view(1, 3, 1, 1))
-        self.register_buffer('std', torch.tensor(std).view(1, 3, 1, 1))
-
-    def forward(self, x):
-        # The ViT was pretrained on 224x224 images, so the 32x32 CIFAR image is enlarged with bilinear
-        # interpolation. This step is differentiable, so attack gradients still flow back to the 32x32 pixels.
-        if self.img_size is not None and x.shape[-1] != self.img_size:
-            x = F.interpolate(x, size=(self.img_size, self.img_size), mode='bilinear', align_corners=False)
-        # Normalisation is part of the model, so attacks never see normalised tensors.
-        x_norm = (x - self.mean) / self.std
-        # EASY: normalising = subtract the average colour, divide by the spread. Models learn better this way.
-        out = self.model(x_norm)
-        # HuggingFace models return an object with .logits; torchvision/timm return a tensor.
-        return out.logits if hasattr(out, 'logits') else out
+    def forward(self, x):  # runs when we give an image to the model
+        if self.img_size is not None and x.shape[-1] != self.img_size:  # the ViT needs bigger images than the small 32x32 ones
+            x = F.interpolate(x, size=(self.img_size, self.img_size), mode='bilinear', align_corners=False)  # enlarge the image smoothly to 224x224
+        x_norm = (x - self.mean) / self.std  # subtract the average colour and divide by the variation (models learn better this way)
+        out = self.model(x_norm)  # run the real model
+        return out.logits if hasattr(out, 'logits') else out  # some models wrap their 10 scores in an object; take the scores out of it
 
 
-def load_cnn_clean(device, pretrained=True, arch="cifar10_resnet20"):
-    """CNN-Clean: pretrained CIFAR-10 ResNet from chenyaofo/pytorch-cifar-models (no training needed).
-
-    pretrained=False builds the same architecture without downloading weights (used when a local
-    checkpoint will be loaded on top).
-    """
-    # "Clean" = trained normally on clean images only (no adversarial training yet). This is the baseline.
-    # ":master" pins the branch. Without it torch.hub first probes github.com/<repo>/tree/main/ to guess
-    # the default branch, and a transient GitHub 5xx on that probe crashed a full Colab run.
-    base = _with_retries(lambda: torch.hub.load(HUB_REPO, arch, pretrained=pretrained, trust_repo=True),
-                         what="torch.hub " + arch)
-    model = NormalizedModelWrapper(base, CIFAR_MEAN, CIFAR_STD, img_size=None)
-    # .eval() = evaluation mode (BatchNorm uses stored statistics, dropout is off).
-    return model.to(device).eval()
+def load_cnn_clean(device, pretrained=True, arch="cifar10_resnet20"):  # get the normally trained CNN (ResNet-20)
+    base = _with_retries(lambda: torch.hub.load(HUB_REPO, arch, pretrained=pretrained, trust_repo=True),  # download the ready-made CNN (retry if the internet fails)
+                         what="torch.hub " + arch)  # name used in the retry message
+    model = NormalizedModelWrapper(base, CIFAR_MEAN, CIFAR_STD, img_size=None)  # put the cover around it; the CNN keeps 32x32 images
+    return model.to(device).eval()  # move it to the GPU/CPU and switch to test mode
 
 
-def load_vit_clean(device, backbone="timm-tiny", pretrained=True):
-    """ViT-Clean.
-
-    backbone="timm-tiny": timm vit_tiny_patch16_224 (ImageNet weights, new 10-class head).
-        Returns needs_clean_finetune=True -> caller runs a short clean fine-tune (default 5 epochs).
-    backbone="hf-base":   HuggingFace ViT-Base already fine-tuned on CIFAR-10. No clean training,
-        but ~16x more compute per image than ViT-Tiny, so adversarial fine-tuning is much slower.
-
-    Returns (model, needs_clean_finetune).
-    """
-    # Both ViTs expect 224x224 input normalised with mean=std=0.5.
-    mean, std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
-    if backbone == "timm-tiny":
-        import timm
-        # "patch16_224": 224x224 input cut into 16x16 patches -> 14x14 = 196 patch tokens.
-        # num_classes=10 replaces the original 1000-class ImageNet head with a new, untrained 10-class
-        # head. That new head is why a short clean fine-tune on CIFAR-10 is needed.
-        base = _with_retries(
-            lambda: timm.create_model("vit_tiny_patch16_224", pretrained=pretrained, num_classes=10),
-            what="timm vit_tiny weights")
-        needs_ft = pretrained  # when pretrained=False we only build the shell for a local checkpoint
-    elif backbone == "hf-base":
-        from transformers import AutoConfig, ViTForImageClassification
-        if pretrained:
-            base = _with_retries(lambda: ViTForImageClassification.from_pretrained(HF_VIT_ID),
-                                 what="HF ViT-Base weights")
-        else:
-            # Build the architecture only (random weights); a saved checkpoint is loaded on top later.
-            base = ViTForImageClassification(AutoConfig.from_pretrained(HF_VIT_ID))
-        needs_ft = False
-    else:
-        raise ValueError(f"Unknown ViT backbone: {backbone}")
-    model = NormalizedModelWrapper(base, mean, std, img_size=224)
-    return model.to(device).eval(), needs_ft
+def load_vit_clean(device, backbone="timm-tiny", pretrained=True):  # get the ViT; also says whether it still needs normal training
+    mean, std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)  # the ViT expects colours centred at 0.5 with a spread of 0.5
+    if backbone == "timm-tiny":  # option 1: small ViT (fast)
+        import timm  # library that contains many ready-made models
+        base = _with_retries(  # download the small ViT (retry if the internet fails)
+            lambda: timm.create_model("vit_tiny_patch16_224", pretrained=pretrained, num_classes=10),  # 224x224 input cut into 16x16 pieces; 10 outputs for our 10 classes
+            what="timm vit_tiny weights")  # name used in the retry message
+        needs_ft = pretrained  # a downloaded ViT has a new empty 10-class end part, so it needs a short normal training
+    elif backbone == "hf-base":  # option 2: bigger ViT from HuggingFace (slower)
+        from transformers import AutoConfig, ViTForImageClassification  # tools to load that bigger ViT
+        if pretrained:  # download the already-learned version
+            base = _with_retries(lambda: ViTForImageClassification.from_pretrained(HF_VIT_ID),  # download it (retry if the internet fails)
+                                 what="HF ViT-Base weights")  # name used in the retry message
+        else:  # only build an empty model; saved weights will be loaded into it later
+            base = ViTForImageClassification(AutoConfig.from_pretrained(HF_VIT_ID))  # same shape, random numbers
+        needs_ft = False  # this one is already trained on CIFAR-10
+    else:  # any other name is a mistake
+        raise ValueError(f"Unknown ViT backbone: {backbone}")  # show an error
+    model = NormalizedModelWrapper(base, mean, std, img_size=224)  # put the cover around it; images are enlarged to 224x224
+    return model.to(device).eval(), needs_ft  # move to the GPU/CPU, test mode; also say if it needs normal training
 
 
-def save_checkpoint(model, path):
-    # state_dict() = a dictionary of all weights (and buffers). Saving it lets us reuse a trained model.
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    torch.save(model.state_dict(), path)
+def save_checkpoint(model, path):  # save the model's learned numbers (weights) to a file
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)  # create the folder if it is missing
+    torch.save(model.state_dict(), path)  # write all learned numbers to the file
 
 
-def load_checkpoint(model, path, device):
-    # Load saved weights into a model with the same architecture.
-    # map_location lets a GPU-trained checkpoint be loaded on a CPU-only machine (and vice versa).
-    model.load_state_dict(torch.load(path, map_location=device))
-    return model.to(device).eval()
+def load_checkpoint(model, path, device):  # load saved weights into a model of the same shape
+    model.load_state_dict(torch.load(path, map_location=device))  # read the file and copy the numbers into the model (works on GPU or CPU)
+    return model.to(device).eval()  # move to the GPU/CPU and switch to test mode
 
 
-def sanity_check(device=None):
-    """Task 2.4: both models must output (batch, 10) on a dummy [0, 1] tensor of shape (4, 3, 32, 32)."""
-    # Check that both models accept 32x32 CIFAR-sized input and return 10 class scores per image.
-    device = device or torch.device("cpu")
-    x = torch.rand(4, 3, 32, 32, device=device)
-    cnn = load_cnn_clean(device)
-    vit, _ = load_vit_clean(device)
-    with torch.no_grad():    # no gradients needed for a simple forward pass (saves memory)
-        for name, m in (("CNN", cnn), ("ViT", vit)):
-            out = m(x)
-            assert out.shape == (4, 10), f"{name} output shape {tuple(out.shape)} != (4, 10)"
-            print(f"[sanity] {name}: input {tuple(x.shape)} -> output {tuple(out.shape)} OK")
+def sanity_check(device=None):  # quick check that both models take a 32x32 image and give 10 scores
+    device = device or torch.device("cpu")  # use the CPU if no device was given
+    x = torch.rand(4, 3, 32, 32, device=device)  # 4 fake colour images of size 32x32
+    cnn = load_cnn_clean(device)  # load the CNN
+    vit, _ = load_vit_clean(device)  # load the ViT (ignore the second answer)
+    with torch.no_grad():  # no learning information needed for a simple test (saves memory)
+        for name, m in (("CNN", cnn), ("ViT", vit)):  # test both models
+            out = m(x)  # get the scores for the 4 fake images
+            assert out.shape == (4, 10), f"{name} output shape {tuple(out.shape)} != (4, 10)"  # must be 4 images x 10 scores, else stop with an error
+            print(f"[sanity] {name}: input {tuple(x.shape)} -> output {tuple(out.shape)} OK")  # tell the user it is fine
 
 
-if __name__ == "__main__":
-    sanity_check()
+if __name__ == "__main__":  # true only when this file is run directly
+    sanity_check()  # run the quick check

@@ -1,145 +1,112 @@
-"""Small shared helpers: seeding, device selection, JSON I/O, git auto-push, Drive sync."""
-import json
-import os
-import random
-import shutil
-import subprocess
-import sys
+"""Small helper tools used by the other files."""
+import json  # read and write JSON text files
+import os  # work with file and folder paths
+import random  # Python's random numbers
+import shutil  # copy files
+import subprocess  # run terminal commands from Python
+import sys  # access to the error output
 
-import numpy as np
-import torch
+import numpy as np  # fast number lists
+import torch  # main library for deep learning
 
-# ===================================================================================================
-# EASY-LANGUAGE SUMMARY OF THIS FILE (read this first)
-# ---------------------------------------------------------------------------------------------------
-# What is this file?   Small helper tools used by the other files (no deep learning here).
-#   set_seed()          - makes random numbers repeatable, so every run gives the same result.
-#   get_device()        - chooses GPU (fast) if available, otherwise CPU (slow).
-#   save_json/load_json - save / read results in a simple text file format (JSON).
-#   git_auto_push()     - automatically uploads the work to GitHub (optional, for Colab).
-#   sync_to_drive / restore_from_drive - back up files to Google Drive and bring them back.
-# ===================================================================================================
-
-# One fixed random seed for the whole project, so results can be reproduced.
-SEED = 42
+SEED = 42  # one fixed starting number for all randomness, so results can be repeated
 
 
-def set_seed(seed: int = SEED):
-    # Python, NumPy and PyTorch each have their own random number generator. Seeding all of them
-    # makes shuffling, random crops and attack random starts the same on every run.
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+def set_seed(seed: int = SEED):  # make all random numbers repeatable
+    random.seed(seed)  # fix Python's random numbers
+    np.random.seed(seed)  # fix NumPy's random numbers
+    torch.manual_seed(seed)  # fix PyTorch's random numbers
+    if torch.cuda.is_available():  # if a GPU exists
+        torch.cuda.manual_seed_all(seed)  # fix the GPU's random numbers too
 
 
-def get_device() -> torch.device:
-    # Use the GPU ("cuda") if there is one, otherwise the CPU.
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def get_device() -> torch.device:  # choose where to run the maths
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")  # GPU (fast) if there is one, else CPU (slow)
 
 
-def save_json(obj, path):
-    # Write a Python dict/list to a readable JSON file (creates the folder if needed).
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(obj, f, indent=2)
+def save_json(obj, path):  # save a Python dictionary or list as a readable text file
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)  # create the folder if it is missing
+    with open(path, "w", encoding="utf-8") as f:  # open the file for writing
+        json.dump(obj, f, indent=2)  # write the data neatly indented
 
 
-def load_json(path, default=None):
-    # Read a JSON file. If it does not exist yet, return `default` instead of crashing.
-    if not os.path.exists(path):
-        return default
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+def load_json(path, default=None):  # read a JSON file; if it does not exist, give back `default`
+    if not os.path.exists(path):  # file is missing
+        return default  # give the fallback value instead of crashing
+    with open(path, "r", encoding="utf-8") as f:  # open the file for reading
+        return json.load(f)  # read and return its content
 
 
-def _exclude_oversized_files(repo_dir, limit_mb=95):
-    """GitHub rejects files > 100MB. Add any .pth/.pt above `limit_mb` to .git/info/exclude."""
-    # .git/info/exclude works like .gitignore but stays local (it is never committed).
-    try:
-        exclude = os.path.join(repo_dir, ".git", "info", "exclude")
-        if not os.path.isdir(os.path.dirname(exclude)):
-            return
-        existing = open(exclude, encoding="utf-8").read() if os.path.exists(exclude) else ""
-        new = []
-        # Walk through every file in checkpoints/ and collect the ones that are too big.
-        for root, _dirs, files in os.walk(os.path.join(repo_dir, "checkpoints")):
-            for f in files:
-                p = os.path.join(root, f)
-                if f.endswith((".pth", ".pt")) and os.path.getsize(p) > limit_mb * 1024 * 1024:
-                    rel = os.path.relpath(p, repo_dir).replace(os.sep, "/")
-                    if rel not in existing:
-                        new.append(rel)
-        if new:
-            with open(exclude, "a", encoding="utf-8") as fh:
-                fh.write("\n" + "\n".join(new) + "\n")
-            print(f"[AUTO-PUSH] Excluded from git (>{limit_mb}MB): {', '.join(new)}")
-    except OSError:
-        pass
+def _exclude_oversized_files(repo_dir, limit_mb=95):  # tell git to ignore saved-model files that are too big for GitHub (limit about 100 MB)
+    try:  # never crash because of this
+        exclude = os.path.join(repo_dir, ".git", "info", "exclude")  # git's private "ignore" list (not shared)
+        if not os.path.isdir(os.path.dirname(exclude)):  # not a git folder
+            return  # nothing to do
+        existing = open(exclude, encoding="utf-8").read() if os.path.exists(exclude) else ""  # read what is already in the ignore list
+        new = []  # big files found
+        for root, _dirs, files in os.walk(os.path.join(repo_dir, "checkpoints")):  # look through the saved-models folder
+            for f in files:  # check every file
+                p = os.path.join(root, f)  # full path of the file
+                if f.endswith((".pth", ".pt")) and os.path.getsize(p) > limit_mb * 1024 * 1024:  # a saved-model file bigger than the limit
+                    rel = os.path.relpath(p, repo_dir).replace(os.sep, "/")  # its path inside the project
+                    if rel not in existing:  # not in the ignore list yet
+                        new.append(rel)  # remember it
+        if new:  # at least one big file found
+            with open(exclude, "a", encoding="utf-8") as fh:  # open the ignore list to add lines
+                fh.write("\n" + "\n".join(new) + "\n")  # add the big files
+            print(f"[AUTO-PUSH] Excluded from git (>{limit_mb}MB): {', '.join(new)}")  # tell the user
+    except OSError:  # a file problem happened
+        pass  # ignore it quietly
 
 
-def git_auto_push(message: str, repo_dir: str = ".") -> bool:
-    """Python equivalent of scripts/auto_push.sh. Never raises: training must not die on a git error.
+def git_auto_push(message: str, repo_dir: str = ".") -> bool:  # saves the work to GitHub automatically; never crashes the training
+    def run(*cmd):  # small helper that runs one terminal command
+        return subprocess.run(cmd, cwd=repo_dir, capture_output=True, text=True)  # run it and collect its output instead of printing it
 
-    Stages everything, commits if there is something to commit, and pushes HEAD to origin.
-    """
-    # Used with --auto-push: saves progress to GitHub during long Colab runs.
-
-    def run(*cmd):
-        # Run a terminal command (e.g. git status) and capture its output instead of printing it.
-        return subprocess.run(cmd, cwd=repo_dir, capture_output=True, text=True)
-
-    try:
-        if run("git", "rev-parse", "--is-inside-work-tree").returncode != 0:
-            print("[AUTO-PUSH] Not a git repository, skipping.")
-            return False
-        _exclude_oversized_files(repo_dir)
-        run("git", "add", ".")
-        # "git diff --cached --quiet" returns 0 when nothing is staged -> nothing to commit.
-        if run("git", "diff", "--cached", "--quiet").returncode == 0:
-            print("[AUTO-PUSH] No file changes to commit.")
-            return True
-        commit = run("git", "commit", "-m", message)
-        if commit.returncode != 0:
-            print(f"[AUTO-PUSH] Commit failed: {commit.stderr.strip()[:300]}")
-            return False
-        push = run("git", "push", "origin", "HEAD")
-        if push.returncode != 0:
-            # stderr can echo the remote URL; never print it in full.
-            print("[AUTO-PUSH] Push failed (check remote / token). Commit kept locally.")
-            return False
-        print(f"[AUTO-PUSH] Successfully pushed to GitHub: {message}")
-        return True
-    except Exception as e:  # noqa: BLE001
-        print(f"[AUTO-PUSH] Skipped due to error: {type(e).__name__}")
-        return False
+    try:  # attempt the upload
+        if run("git", "rev-parse", "--is-inside-work-tree").returncode != 0:  # check this folder is a git project
+            print("[AUTO-PUSH] Not a git repository, skipping.")  # it is not
+            return False  # stop
+        _exclude_oversized_files(repo_dir)  # skip files that are too big for GitHub
+        run("git", "add", ".")  # mark all changed files to be saved
+        if run("git", "diff", "--cached", "--quiet").returncode == 0:  # code 0 means nothing changed
+            print("[AUTO-PUSH] No file changes to commit.")  # tell the user
+            return True  # nothing to upload
+        commit = run("git", "commit", "-m", message)  # save a snapshot with the given message
+        if commit.returncode != 0:  # saving the snapshot failed
+            print(f"[AUTO-PUSH] Commit failed: {commit.stderr.strip()[:300]}")  # show the reason
+            return False  # stop
+        push = run("git", "push", "origin", "HEAD")  # upload the snapshot to GitHub
+        if push.returncode != 0:  # the upload failed
+            print("[AUTO-PUSH] Push failed (check remote / token). Commit kept locally.")  # tell the user (the details are hidden because they may contain secrets)
+            return False  # stop
+        print(f"[AUTO-PUSH] Successfully pushed to GitHub: {message}")  # tell the user it worked
+        return True  # success
+    except Exception as e:  # noqa: BLE001 - anything unexpected
+        print(f"[AUTO-PUSH] Skipped due to error: {type(e).__name__}")  # tell the user, but keep going
+        return False  # stop
 
 
-def sync_to_drive(src_dir: str, drive_dir: str):
-    """Copy a directory tree (e.g. checkpoints/) to Google Drive so a disconnect never loses work."""
-    # Colab deletes local files when the session ends; Google Drive keeps them.
-    if not drive_dir:
-        return    # not on Colab / no Drive folder given -> do nothing
-    try:
-        os.makedirs(drive_dir, exist_ok=True)
-        for name in os.listdir(src_dir):
-            s = os.path.join(src_dir, name)
-            if os.path.isfile(s):
-                shutil.copy2(s, os.path.join(drive_dir, name))
-    except Exception as e:  # noqa: BLE001
-        print(f"[DRIVE] Sync skipped: {type(e).__name__}: {e}", file=sys.stderr)
+def sync_to_drive(src_dir: str, drive_dir: str):  # copy a folder's files to Google Drive, so nothing is lost if Colab disconnects
+    if not drive_dir:  # no Drive folder given
+        return  # do nothing
+    try:  # attempt the copy
+        os.makedirs(drive_dir, exist_ok=True)  # create the Drive folder if it is missing
+        for name in os.listdir(src_dir):  # go through everything in the source folder
+            s = os.path.join(src_dir, name)  # full path of the item
+            if os.path.isfile(s):  # only copy files, not folders
+                shutil.copy2(s, os.path.join(drive_dir, name))  # copy the file to Drive
+    except Exception as e:  # noqa: BLE001 - copying failed
+        print(f"[DRIVE] Sync skipped: {type(e).__name__}: {e}", file=sys.stderr)  # tell the user, but keep going
 
 
-def restore_from_drive(dest_dir: str, drive_dir: str):
-    """Copy files from Drive into dest_dir if they are not already there."""
-    # The opposite of sync_to_drive: at the start of a new Colab session, bring back saved checkpoints.
-    if not drive_dir or not os.path.isdir(drive_dir):
-        return
-    os.makedirs(dest_dir, exist_ok=True)
-    for name in os.listdir(drive_dir):
-        d = os.path.join(dest_dir, name)
-        s = os.path.join(drive_dir, name)
-        if os.path.isfile(s) and not os.path.exists(d):
-            shutil.copy2(s, d)
-            print(f"[DRIVE] Restored {name}")
+def restore_from_drive(dest_dir: str, drive_dir: str):  # the opposite: bring saved files back from Google Drive
+    if not drive_dir or not os.path.isdir(drive_dir):  # no Drive folder to read from
+        return  # do nothing
+    os.makedirs(dest_dir, exist_ok=True)  # create the local folder if it is missing
+    for name in os.listdir(drive_dir):  # go through the files on Drive
+        d = os.path.join(dest_dir, name)  # where the file should go here
+        s = os.path.join(drive_dir, name)  # where it is on Drive
+        if os.path.isfile(s) and not os.path.exists(d):  # it is a file and we do not have it yet
+            shutil.copy2(s, d)  # copy it here
+            print(f"[DRIVE] Restored {name}")  # tell the user
