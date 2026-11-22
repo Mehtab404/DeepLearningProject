@@ -8,6 +8,8 @@ import torch.nn.functional as F  # ready-made maths functions (we use it to resi
 
 CIFAR_MEAN = (0.4914, 0.4822, 0.4465)  # average red, green, blue value of the training images
 CIFAR_STD = (0.2470, 0.2435, 0.2616)  # how much red, green, blue values usually vary from that average
+IMAGENET_MEAN = (0.485, 0.456, 0.406)  # average colour of ImageNet pictures (used by the ImageNet-pretrained ResNet-18)
+IMAGENET_STD = (0.229, 0.224, 0.225)  # how much ImageNet colours usually vary from that average
 
 CIFAR10_CLASSES = ["airplane", "automobile", "bird", "cat", "deer",  # the 10 picture types; label 0 = airplane, 1 = automobile, ...
                    "dog", "frog", "horse", "ship", "truck"]  # ... label 9 = truck
@@ -72,6 +74,15 @@ def load_vit_clean(device, backbone="timm-tiny", pretrained=True):  # get the Vi
         raise ValueError(f"Unknown ViT backbone: {backbone}")  # show an error
     model = NormalizedModelWrapper(base, mean, std, img_size=224)  # put the cover around it; images are enlarged to 224x224
     return model.to(device).eval(), needs_ft  # move to the GPU/CPU, test mode; also say if it needs normal training
+
+
+def load_resnet18_clean(device, pretrained=True):  # get an ImageNet-pretrained ResNet-18 (about 11M weights) that takes 224x224 pictures, like the ViT
+    import timm  # library that contains many ready-made models
+    base = _with_retries(  # download the weights (retry if the internet fails)
+        lambda: timm.create_model("resnet18", pretrained=pretrained, num_classes=10),  # new empty 10-class end part for CIFAR-10
+        what="timm resnet18 weights")  # name used in the retry message
+    model = NormalizedModelWrapper(base, IMAGENET_MEAN, IMAGENET_STD, img_size=224)  # same cover as the ViT: enlarge to 224x224, normalise inside the model
+    return model.to(device).eval(), pretrained  # move to the GPU/CPU, test mode; a downloaded model still needs normal training
 
 
 def save_checkpoint(model, path):  # save the model's learned numbers (weights) to a file
