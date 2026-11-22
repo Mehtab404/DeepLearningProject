@@ -117,7 +117,7 @@ the same thing for the CNN and the ViT.
 \item A same-recipe comparison of four models (CNN and ViT, clean and
 adversarially fine-tuned) with accuracy-versus-$\epsilon$ curves, a
 cost-versus-gain analysis and a cross-model transferability matrix. The
-two architectures differ in size and pretraining (Section~6).
+two architectures differ in size and pretraining (Section~\ref{sec:disc}).
 \item A documented negative result: ViT adversarial training with a
 single-step attack looks robust under FGSM but is not robust under PGD.
 \end{itemize}
@@ -185,8 +185,8 @@ al.~\cite{Mahmood:21} find that adversarial examples do not readily
 transfer between CNNs and transformers, and
 Bhojanapalli et al.~\cite{Bhojanapalli:21} study how transformers react to
 other input and model perturbations. Our results point the same way: the
-ViT is ahead under PGD, and examples crafted on one family
-transfer weakly to the other (Section~5.5). Our comparison is much
+ViT is ahead under PGD, and examples crafted on the CNN barely fool the
+ViT (85.4\% accuracy remains, Section~\ref{sec:transfer}). Our comparison is much
 smaller, however, and it does not isolate the architecture from model size
 and pretraining.
 On the evaluation side, Croce and Hein~\cite{Croce:20} showed that
@@ -195,7 +195,7 @@ AutoAttack ensemble, which we did not run. Our PGD-50 check with
 restarts is a cheaper step in the same direction. Rice et
 al.~\cite{Rice:20} describe robust overfitting, in which robust accuracy
 on the test set falls behind robust accuracy on the training set. Our
-last-epoch training numbers (Section~6) show a similar gap.
+last-epoch training numbers (Section~\ref{sec:disc}) show a similar gap.
 
 \section{Method}
 
@@ -232,10 +232,14 @@ $224 \times 224$ with bilinear interpolation. About 5.7M parameters.
 models after adversarial fine-tuning (next section).
 \end{itemize}
 
-\textbf{Pretrained models used.} To stay within the time limit of a free
-GPU, both architectures start from publicly available pretrained weights
-instead of being trained from random initialisation
-(Table~\ref{tab:pretrained}). The ResNet-20 weights are already trained on
+\textbf{Pretrained models used.} Both architectures start from publicly
+available pretrained weights instead of being trained from random
+initialisation (Table~\ref{tab:pretrained}). We used the public CIFAR-10
+weights of ResNet-20 as a standard baseline, so we did not train the CNN
+from scratch; the adversarial fine-tuning described below is our own
+training. Training a ViT from scratch on a small dataset such as CIFAR-10
+is slow and usually reaches lower accuracy, so we started the ViT-Tiny
+from ImageNet weights. The ResNet-20 weights are already trained on
 CIFAR-10, so no clean training was needed. The ViT-Tiny weights come from
 ImageNet, so we replaced its classifier with a 10-class head and
 fine-tuned it on CIFAR-10. Both architectures were then trained by us
@@ -352,7 +356,9 @@ ViT-Clean (ViT-Tiny)     & 97.1 & 22.4 & 0.0  \\
 ViT-AdvTrained (PGD-5)   & 94.1 & 72.7 & 42.2 \\ \hline
 \end{tabular}
 }
-\caption{Accuracy (\%) on 1000 test images at $\epsilon = 8/255$.}
+\caption{Accuracy (\%) on 1000 test images at $\epsilon = 8/255$. The
+PGD-10 values for the adversarially trained models are optimistic
+(Table~\ref{tab:strong}).}
 \label{tab:main}
 \end{table}
 
@@ -373,7 +379,8 @@ PGD-10 & CNN-Clean      & 91.5 & 21.8 & 0.6  & 0.0  & 0.0  & 0.0  \\
 \end{tabular}
 }
 \caption{Accuracy (\%) for every model, attack and $\epsilon$
-($N = 1000$).}
+($N = 1000$). PGD-10 values for the adversarially trained models are
+optimistic (Table~\ref{tab:strong}).}
 \label{tab:full}
 \end{table}
 
@@ -384,7 +391,7 @@ accuracy at small budgets, and under FGSM at $8/255$ it keeps 22.4\%
 against 11.9\% for the CNN.
 
 After adversarial fine-tuning, the PGD-10 curves of both models move up at
-every budget up to $8/255$. The ViT is ahead of the CNN by 21.7, 25.5,
+every budget up to $8/255$. Under PGD-10 the ViT is ahead of the CNN by 21.7, 25.5,
 28.5 and 23.9 points at $\epsilon = 1, 2, 4$ and $8/255$, and by 4.3
 points at $16/255$, where both models are close to 0\%. At twice the
 training budget neither model is robust.
@@ -426,8 +433,8 @@ ViT-AdvTrained & 94.1 & 42.6 & 34.4 \\ \hline
 }
 \caption{Accuracy (\%) at $\epsilon = 8/255$ ($N = 1000$) under the
 standard and the stronger attack. The PGD-10 value for the ViT (42.6) was
-measured again in this session and differs from Table~\ref{tab:main}
-(42.2) only because the random starts differ.}
+measured again in the separate session used for this check and differs
+from Table~\ref{tab:main} (42.2) only because the random starts differ.}
 \label{tab:strong}
 \end{table}
 
@@ -475,6 +482,7 @@ robustness with PGD, not with FGSM alone. The CNN-versus-ViT comparison in
 this report uses PGD-5 for both models.
 
 \subsection{Transferability}
+\label{sec:transfer}
 
 Figure~\ref{fig:transfer} and Table~\ref{tab:transfer} show the accuracy
 of each target model on PGD-10 examples crafted on each source model.
@@ -537,6 +545,7 @@ the four models.}
 \end{figure}
 
 \section{Discussion}
+\label{sec:disc}
 
 \textbf{RQ1: robustness across architectures.} Under the same training
 recipe, the adversarially trained ViT is more robust than the adversarially
@@ -594,13 +603,14 @@ a PGD perturbation of $8/255$. Adversarial fine-tuning costs about 3
 points of clean accuracy for both models and raises PGD-10 accuracy at
 $8/255$ to 18.3\% (CNN) and 42.2\% (ViT). A stronger attack (PGD-50 with
 5 restarts) lowers these to 8.2\% and 34.4\%, so PGD-10 alone overstates
-robustness. The ViT is more robust than the CNN at every tested budget
-under PGD-10 and under the stronger attack at $8/255$, though model size
-and pretraining differ between them. A ViT trained with the cheaper RS-FGSM attack looked robust
+robustness. The ViT is more robust than the CNN at every tested budget up
+to $8/255$ under PGD-10 (at $16/255$ both are near 0\%) and under the
+stronger attack at $8/255$, though model size and pretraining differ
+between them. A ViT trained with the cheaper RS-FGSM attack looked robust
 under FGSM but was not robust under PGD, so single-step attacks should not
-be the only evaluation. Future work includes repeating the runs with
-several seeds, testing stronger attacks such as AutoAttack, and comparing
-models of similar size and pretraining.
+be the only evaluation. Future work includes training the CNN from
+scratch, repeating the runs with several seeds, testing stronger attacks
+such as AutoAttack, and comparing models of similar size and pretraining.
 
 \begin{thebibliography}{99}
 

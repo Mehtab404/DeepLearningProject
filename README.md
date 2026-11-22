@@ -78,12 +78,21 @@ Accuracy (%) at eps = 8/255, N = 1000 (full table over all eps in `outputs/resul
 | ViT-Clean (ViT-Tiny) | 97.1 | 22.4 | 0.0 |
 | ViT-AdvTrained (PGD-5) | 94.1 | 72.7 | 42.2 |
 
-PGD-10 accuracy (%) across eps, the strongest attack evaluated:
+PGD-10 accuracy (%) across eps (optimistic for the adversarially trained models, see the stronger-attack check below):
 
 | Model | 0 | 1/255 | 2/255 | 4/255 | 8/255 | 16/255 |
 | --- | --- | --- | --- | --- | --- | --- |
 | CNN-AdvTrained | 88.4 | 64.1 | 54.6 | 39.7 | 18.3 | 1.0 |
 | ViT-AdvTrained | 94.1 | 85.8 | 80.1 | 68.2 | 42.2 | 5.3 |
+
+Stronger-attack check at eps = 8/255 (`scripts/strong_attack_check.py`, results in `outputs_strong_attack/strong_attack_results.csv`): PGD-50 with 5 random restarts, worst case over restarts, same 1000 images.
+
+| Model | PGD-10, 1 start | PGD-50, 5 restarts |
+| --- | --- | --- |
+| CNN-AdvTrained | 18.3 | 8.2 |
+| ViT-AdvTrained | 42.6 (42.2 in the main run, different random starts) | 34.4 |
+
+PGD-10 therefore overstates robustness, most for the CNN. The ViT stays ahead (34.4% vs 8.2%). The check was run only at eps = 8/255.
 
 1. **Undefended models collapse under attack, the ViT a little more slowly.** Under PGD-10 the CNN falls to 21.8% at eps = 1/255 and 0.6% at 2/255. The ViT keeps 48.4% at 1/255 and 6.8% at 2/255. Both are at about 0% from 4/255. Under FGSM at 8/255 the ViT keeps 22.4% against 11.9% for the CNN.
 2. **Cost of adversarial fine-tuning on clean accuracy.** CNN: 91.5% -> 88.4% (-3.1 points). ViT: 97.1% -> 94.1% (-3.0 points). The two costs are about equal. With N = 1000 the standard error of one accuracy is about 1 point, so the two drops cannot be told apart.
@@ -97,7 +106,7 @@ Training cost on the Colab T4: CNN 6.3 min (PGD-5), ViT 74.7 min (PGD-5), summed
 ## Evaluation protocol and caveats
 
 - Evaluation uses a fixed stratified subset of N = 1000 CIFAR-10 test images (100 per class, seed 42). With N = 1000 the standard error of an accuracy is up to about 1.6 points, so small differences are not significant.
-- PGD-10 uses alpha = max(eps/4, 1/255) with a random start. This is a white-box evaluation with a modest number of steps; it is an upper bound on robustness, not a certified one. Stronger attacks (more steps, restarts, AutoAttack) would lower the numbers.
+- PGD-10 uses alpha = max(eps/4, 1/255) with a random start. This is a white-box evaluation with a modest number of steps; it is an upper bound on robustness, not a certified one. A PGD-50 check with 5 restarts at eps = 8/255 lowers the numbers to 8.2% (CNN) and 34.4% (ViT). AutoAttack was not run.
 - Training-time numbers come from a single run with seed 42; no repeat runs, so no variance estimate across training seeds.
 - The final results come from two Colab sessions. `CNN-Clean` and `CNN-AdvTrained` come from the first session; `ViT-Clean` and `ViT-AdvTrained` come from the second, which re-ran the 5-epoch clean ViT fine-tune because `vit_clean.pth` had not been saved. `CNN-Clean` is the same pretrained checkpoint in both sessions, and `cnn_adv.pth` is unchanged.
 - Large single weight files (> 95 MB, e.g. ViT-Base) are excluded from git automatically; keep them on Google Drive.
