@@ -23,14 +23,15 @@
 \newcommand{\num}{0}            % Number (default 0)
 \setcounter{page}{1}            % First page (default 1)
 \newcommand{\begpag}{\thepage}
-\newcommand{\finpag}{9}         % Last Page (update after compiling)
+\newcommand{\finpag}{10}        % Last Page (update after compiling)
 \newcommand{\yearp}{2026}       % Year
 %------------------------------------------------------------------
 \renewcommand{\thefootnote}{\fnsymbol{footnote}}
 
 \title{Adversarial Attacks and Defences: CNN vs Vision Transformer
 Robustness on CIFAR-10
-\footnote[0]{\raggedright Correspondence to: \texttt{su-24062@sitare.org}, \texttt{su-24055@sitare.org},\\ \texttt{su-24075@sitare.org}, \texttt{su-24076@sitare.org} \vspace{0.2cm}}
+\footnote[0]{\raggedright Correspondence to: \texttt{su-24062@sitare.org}, \texttt{su-24055@sitare.org},\\ \texttt{su-24075@sitare.org}, \texttt{su-24076@sitare.org}\\
+Recommended for acceptance by Chhavi Sharma and Muskan Katiyar \vspace{0.2cm}}
 }
 
 \author{
@@ -42,7 +43,7 @@ Mayank Raj$^*$                    & Mehtab Alam$^*$                   \\
 {\small 202410101200076}          & {\small 202410101200075}          \\
 {\small \texttt{su-24075@sitare.org}} & {\small \texttt{su-24076@sitare.org}} \\
 \end{tabular} \\ \\
-\centerline{\small \em $^*$ Sitare University, Lucknow, India} \\ \\
+\centerline{\small \em $^*$ Department of Computer Science, Sitare University, Lucknow, India} \\ \\
 \centerline{\small Course project report, November 2026}
        }
 
@@ -52,30 +53,28 @@ Mayank Raj$^*$                    & Mehtab Alam$^*$                   \\
 
 \pagestyle{myheadings}
 
-\markboth{\centerline{\small \it Adversarial Attacks and Defences: CNN vs ViT Robustness}}
-         {\centerline{\small \it Adversarial Attacks and Defences: CNN vs ViT Robustness}}
+\markboth{\centerline{\small \it Akhtar et al. / Electronic Letters on Computer Vision and Image Analysis 0(0):1-10, 2026}}
+         {\centerline{\small \it Akhtar et al. / Electronic Letters on Computer Vision and Image Analysis 0(0):1-10, 2026}}
 \hrulefill
 
 \begin{abstract}
 
 Small, visually invisible pixel changes can make an image classifier
-predict the wrong class. This report compares how a convolutional
-neural network (ResNet-20) and a small Vision Transformer (ViT-Tiny)
-resist gradient-based $\ell_\infty$ attacks on CIFAR-10, and measures what
-adversarial training costs in clean accuracy.
-FGSM and PGD are implemented from scratch in PyTorch. Each
-architecture is attacked before and after 10 epochs of adversarial
-fine-tuning ($\epsilon = 8/255$, 5-step PGD, mixed precision). On a
-fixed set of 1000 stratified test images, undefended models drop to
-about 0\% accuracy under PGD-10 at $\epsilon = 8/255$. Adversarial
-fine-tuning raises PGD-10 accuracy to 18.3\% for the CNN and 42.2\% for
-the ViT, at a cost of about 3 points of clean accuracy for both. A
-stronger attack (PGD-50 with 5 restarts) lowers these values to 8.2\% and
-34.4\%, so PGD-10 overstates robustness, but the ViT stays ahead. Because
-the two networks differ in size and pretraining, the gap is not evidence
-that attention itself is the cause. A first ViT run trained with a
-one-step attack (RS-FGSM) reached 79.8\% under FGSM but 4.9\% under
-PGD-10, consistent with catastrophic overfitting.
+predict the wrong class. This report compares how a ResNet-20 CNN and a
+ViT-Tiny Vision Transformer resist gradient-based $\ell_\infty$ attacks
+on CIFAR-10, and measures what adversarial training costs in clean
+accuracy. FGSM and PGD are implemented from scratch in PyTorch. Each
+model is attacked before and after 10 epochs of adversarial fine-tuning
+($\epsilon = 8/255$, 5-step PGD). On 1000 stratified test images,
+undefended models fall to about 0\% accuracy under PGD-10 at
+$\epsilon = 8/255$. Fine-tuning raises PGD-10 accuracy to 18.3\% (CNN)
+and 42.2\% (ViT) for a clean-accuracy cost of about 3 points. A stronger
+attack (PGD-50 with 5 restarts) lowers these to 8.2\% and 34.4\%, so
+PGD-10 overstates robustness, but the ViT stays ahead. The two networks
+differ in size and pretraining, so this does not show that attention
+itself is the cause. A first ViT run trained with a one-step attack
+(RS-FGSM) scored 79.8\% under FGSM but 4.9\% under PGD-10, consistent
+with catastrophic overfitting.
 
 \vspace{0.5cm}
 \noindent
@@ -115,9 +114,10 @@ pixel range.
 \item A pipeline that keeps images in $[0,1]$ for both architectures by
 placing normalisation and resizing inside the model, so $\epsilon$ means
 the same thing for the CNN and the ViT.
-\item A controlled comparison of four models (CNN and ViT, clean and
+\item A same-recipe comparison of four models (CNN and ViT, clean and
 adversarially fine-tuned) with accuracy-versus-$\epsilon$ curves, a
-cost-versus-gain analysis and a cross-model transferability matrix.
+cost-versus-gain analysis and a cross-model transferability matrix. The
+two architectures differ in size and pretraining (Section~6).
 \item A documented negative result: ViT adversarial training with a
 single-step attack looks robust under FGSM but is not robust under PGD.
 \end{itemize}
@@ -175,6 +175,27 @@ start and one large step ($\alpha = 1.25\,\epsilon$). It is much cheaper,
 but it can suffer from \emph{catastrophic overfitting}: the model becomes
 robust to the one-step attack it trains against and loses robustness to
 stronger attacks.
+
+\subsection{Related work}
+
+Several studies compare Vision Transformers with CNNs under attack.
+Shao et al.~\cite{Shao:22} report that ViTs are more robust than CNNs in
+white-box and transfer settings. Mahmood et
+al.~\cite{Mahmood:21} find that adversarial examples do not readily
+transfer between CNNs and transformers, and
+Bhojanapalli et al.~\cite{Bhojanapalli:21} study how transformers react to
+other input and model perturbations. Our results point the same way: the
+ViT is ahead under PGD, and examples crafted on one family
+transfer weakly to the other (Section~5.5). Our comparison is much
+smaller, however, and it does not isolate the architecture from model size
+and pretraining.
+On the evaluation side, Croce and Hein~\cite{Croce:20} showed that
+attacks with few steps can overestimate robustness and proposed the
+AutoAttack ensemble, which we did not run. Our PGD-50 check with
+restarts is a cheaper step in the same direction. Rice et
+al.~\cite{Rice:20} describe robust overfitting, in which robust accuracy
+on the test set falls behind robust accuracy on the training set. Our
+last-epoch training numbers (Section~6) show a similar gap.
 
 \section{Method}
 
@@ -494,7 +515,7 @@ examples from CNN-AdvTrained leave CNN-Clean at 9.1\%, and examples from
 ViT-AdvTrained leave ViT-Clean at 32.4\%, which is expected since each
 adversarial model was fine-tuned from its clean version. Finally,
 transferred examples leave ViT-AdvTrained at 82 to 87\%, while a
-white-box attack leaves it at 42.2\%. A transfer (black-box) test alone
+white-box attack leaves it at 42.2\% (34.4\% under PGD-50 with restarts). A transfer (black-box) test alone
 would therefore overstate its robustness.
 
 \subsection{Qualitative examples}
@@ -547,11 +568,14 @@ robust accuracy. PGD-50 with 5 restarts already lowers the values at
 $8/255$ to 8.2\% (CNN) and 34.4\% (ViT), and we did not re-run it at the
 other budgets. AutoAttack was not run, so even these values may be
 optimistic. No certified robustness is claimed.
-\item \emph{Robust generalisation gap.} For both models, the adversarial
+\item \emph{Robust generalisation gap.} For both models, the PGD-5
 accuracy on training batches in the last epoch (CNN 31.8\%, ViT 59.1\%)
 is higher than the PGD-10 test accuracy at $8/255$ (18.3\% and 42.2\%).
-The attacks and data augmentation differ between the two measurements, so
-the gap is only indicative.
+The ViT also reaches 99.85\% clean accuracy on its training batches
+against 94.1\% on the test subset. This is consistent with robust
+overfitting \cite{Rice:20}, but the attacks (PGD-5 and PGD-10) and the
+data (augmented training batches and the test subset) differ, so the gap
+is only indicative.
 \item \emph{Short fine-tuning.} Only 10 epochs from pretrained weights
 were used, which keeps the run on a free GPU but is shorter than
 training robust models from scratch.
@@ -618,10 +642,12 @@ Technical Report, University of Toronto, 2009.
 Y. Chen, ``PyTorch CIFAR models: pretrained ResNet, MobileNet and other
 models for CIFAR-10/100'', GitHub repository
 \texttt{chenyaofo/pytorch-cifar-models}.
+\url{https://github.com/chenyaofo/pytorch-cifar-models}
 
 \bibitem{Wightman:19}
 R. Wightman, ``PyTorch Image Models (timm)'', GitHub repository
 \texttt{huggingface/pytorch-image-models}, 2019.
+\url{https://github.com/huggingface/pytorch-image-models}
 
 \bibitem{Loshchilov:19}
 I. Loshchilov, F. Hutter, ``Decoupled Weight Decay Regularization'',
@@ -635,6 +661,32 @@ Learning Representations (ICLR)}, 2018.
 A. Paszke et al., ``PyTorch: An Imperative Style, High-Performance Deep
 Learning Library'', {\em Advances in Neural Information Processing Systems
 (NeurIPS)}, 2019.
+
+\bibitem{Shao:22}
+R. Shao, Z. Shi, J. Yi, P.-Y. Chen, C.-J. Hsieh, ``On the Adversarial
+Robustness of Vision Transformers'', arXiv:2103.15670.
+\url{https://arxiv.org/abs/2103.15670}
+
+\bibitem{Mahmood:21}
+K. Mahmood, R. Mahmood, M. van Dijk, ``On the Robustness of Vision
+Transformers to Adversarial Examples'', {\em IEEE/CVF Intl. Conf. on
+Computer Vision (ICCV)}, 2021. \url{https://arxiv.org/abs/2104.02610}
+
+\bibitem{Bhojanapalli:21}
+S. Bhojanapalli, A. Chakrabarti, D. Glasner, D. Li, T. Unterthiner,
+A. Veit, ``Understanding Robustness of Transformers for Image
+Classification'', {\em IEEE/CVF Intl. Conf. on Computer Vision (ICCV)},
+2021. \url{https://arxiv.org/abs/2103.14586}
+
+\bibitem{Croce:20}
+F. Croce, M. Hein, ``Reliable evaluation of adversarial robustness with
+an ensemble of diverse parameter-free attacks'', {\em Intl. Conf. on
+Machine Learning (ICML)}, 2020. \url{https://arxiv.org/abs/2003.01690}
+
+\bibitem{Rice:20}
+L. Rice, E. Wong, J. Z. Kolter, ``Overfitting in adversarially robust
+deep learning'', {\em Intl. Conf. on Machine Learning (ICML)}, 2020.
+\url{https://arxiv.org/abs/2002.11569}
 
 \end{thebibliography}
 
