@@ -1,5 +1,0 @@
-source \ target,CNN-Clean,ViT-Clean,CNN-AdvTrained,ViT-AdvTrained
-CNN-Clean,0.0,85.4,69.2,87.1
-ViT-Clean,65.8,0.0,79.5,86.1
-CNN-AdvTrained,9.1,78.0,18.3,82.1
-ViT-AdvTrained,45.7,32.4,51.3,42.2
